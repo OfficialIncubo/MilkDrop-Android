@@ -47,6 +47,7 @@ import com.milkdrop.visualizer.render.MilkDropRenderer.Navigation
 import com.milkdrop.visualizer.render.MilkDropSurfaceView
 import com.milkdrop.visualizer.settings.AppSettings
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ratings: PresetRatings
     private lateinit var ratingsStore: PresetRatingsStore
     private var hadStorageAccess = false
+    private var presetScanGeneration = 0
 
     /** Every scanned preset, hidden ones included; the playlist is this minus the hidden ones. */
     private var allPresetPaths: List<String> = emptyList()
@@ -137,8 +139,6 @@ class MainActivity : AppCompatActivity() {
         qualityIndex = settings.qualityIndex
         restoreControlStates()
 
-        if (hadStorageAccess) PresetPaths.ensureDirsExist()
-
         surfaceView = MilkDropSurfaceView(this, PresetPaths.texturesDir)
         surfaceView.milkDropRenderer.onInitializationFailed = {
             runOnUiThread {
@@ -201,10 +201,11 @@ class MainActivity : AppCompatActivity() {
     /**
      * Scanning the presets directory takes seconds, so a launch starts from the list cached by the
      * previous run (and resumes the last preset) almost immediately, then rescans in the background
-     * and swaps in the new list only if the folder changed. projectM shows its idle preset, with a
-     * "Loading presets…" line, until the first list arrives — i.e. only on the very first launch.
+     * and swaps in the new list only if the folder changed. Without a cache, the first discovered
+     * preset starts while the rest of the tree is scanned. Folder setup happens on this worker too.
      */
     private fun loadPresetsInBackground() {
+        val generation = ++presetScanGeneration
         val renderer = surfaceView.milkDropRenderer
         renderer.startPresetPath = settings.lastPresetPath
         renderer.onPresetChanged = { path ->
@@ -223,23 +224,43 @@ class MainActivity : AppCompatActivity() {
         setStatusMessage(R.string.presets_loading)
 
         val cache = PresetListCache(File(filesDir, PRESET_CACHE_FILE))
+        fun publish(action: () -> Unit) {
+            runOnUiThread {
+                if (generation == presetScanGeneration && !isDestroyed) action()
+            }
+        }
         Thread({
-            val cached = cache.read()
-            if (cached.isNotEmpty()) {
-                runOnUiThread { setAllPresets(cached) }
-            }
+            try {
+                PresetPaths.ensureDirsExist()
+                publish { renderer.refreshTextureSearchPaths() }
+                val cached = cache.read()
+                if (cached.isNotEmpty()) {
+                    publish { setAllPresets(cached) }
+                }
 
-            val startMs = SystemClock.elapsedRealtime()
-            val scanned = PresetPaths.scanPresets()
-            Log.d(TAG, "Scanned ${scanned.size} presets in ${SystemClock.elapsedRealtime() - startMs} ms")
-            // An empty scan (e.g. storage access not granted yet) never overwrites a good cache.
-            if (scanned.isNotEmpty() && scanned != cached) {
-                cache.write(scanned)
-                runOnUiThread { setAllPresets(scanned) }
-            }
-            if (scanned.isEmpty() && cached.isEmpty()) {
-                val message = if (hasAllFilesAccess()) R.string.presets_none_found else R.string.presets_need_access
-                runOnUiThread { setStatusMessage(message) }
+                val startMs = SystemClock.elapsedRealtime()
+                val scanned = PresetPaths.scanPresets { first ->
+                    if (cached.isEmpty()) publish { setAllPresets(listOf(first)) }
+                }
+                Log.d(TAG, "Scanned ${scanned.size} presets in ${SystemClock.elapsedRealtime() - startMs} ms")
+                // Only publish/cache a completed scan while storage access is still available.
+                if (!hasAllFilesAccess()) {
+                    publish { setStatusMessage(R.string.presets_need_access) }
+                    return@Thread
+                }
+                if (scanned != cached) {
+                    cache.write(scanned)
+                    publish { setAllPresets(scanned) }
+                }
+                if (scanned.isEmpty()) {
+                    publish { setStatusMessage(R.string.presets_none_found) }
+                }
+            } catch (e: IOException) {
+                Log.w(TAG, "Unable to prepare preset folders", e)
+                publish { setStatusMessage(R.string.presets_storage_unavailable) }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Unable to access preset folders", e)
+                publish { setStatusMessage(R.string.presets_need_access) }
             }
         }, "milkdrop-preset-scan").start()
     }
@@ -374,7 +395,6 @@ class MainActivity : AppCompatActivity() {
         surfaceView.onResume()
         val storageAccess = hasAllFilesAccess()
         if (storageAccess && !hadStorageAccess) {
-            PresetPaths.ensureDirsExist()
             ratings = PresetRatings(ratingsStore.loadFavourites(), ratingsStore.loadHidden(), ratingsStore::save)
             updateFavouriteButton()
             loadPresetsInBackground()

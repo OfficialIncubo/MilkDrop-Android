@@ -4,6 +4,7 @@ import android.opengl.GLSurfaceView
 import android.os.SystemClock
 import android.util.Log
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -79,6 +80,12 @@ class MilkDropRenderer(
     private var appliedBeatCuts: Boolean? = null
 
     private val pendingNavigation = AtomicReference<Navigation?>(null)
+    private val pendingTextureRefresh = AtomicBoolean(false)
+
+    /** Apply on the GL thread before loading presets after storage setup or permission changes. */
+    fun refreshTextureSearchPaths() {
+        pendingTextureRefresh.set(true)
+    }
 
     /**
      * Preset to resume on when a playlist is first built, e.g. the one showing at last exit. Kept
@@ -211,6 +218,10 @@ class MilkDropRenderer(
         val currentHandle = handle
         if (currentHandle == 0L) return
 
+        if (pendingTextureRefresh.getAndSet(false)) {
+            ProjectMBridge.nativeSetTextureSearchPaths(currentHandle, arrayOf(texturesDir.absolutePath))
+        }
+
         val shuffle = shuffleEnabled
         if (shuffle != appliedShuffle) {
             ProjectMBridge.nativeSetShuffle(currentHandle, shuffle)
@@ -252,9 +263,13 @@ class MilkDropRenderer(
         val paths = presetPaths
         if (paths.isNotEmpty() && paths !== loadedPaths) {
             loadPlaylist(currentHandle, paths)
+        } else if (paths.isEmpty() && loadedPaths?.isNotEmpty() == true) {
+            ProjectMBridge.nativeClearPresets(currentHandle)
+            loadedPaths = paths
+            lastReportedPosition = -1
         }
 
-        if (loadedPaths != null) {
+        if (loadedPaths?.isNotEmpty() == true) {
             pendingNavigation.getAndSet(null)?.let { navigate(currentHandle, it) }
         }
     }

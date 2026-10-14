@@ -37,7 +37,8 @@ may require uninstalling the existing app first.
 
 ## Setting up presets
 
-On first launch the app creates two folders on external storage:
+On startup, after storage access is granted, the app creates any missing folders on external
+storage and reuses existing folders and their contents:
 
 - `/storage/emulated/0/MilkDropApp/presets/` — drop preset pack folders here (e.g. "Cream of
   the Crop", "Milkdrop2", "Classic projectM"). Subfolders are scanned recursively.
@@ -45,6 +46,13 @@ On first launch the app creates two folders on external storage:
   many presets reference shared textures by name.
 
 Grant the "All files access" permission when prompted so the app can read these folders.
+
+Existing presets load automatically, including presets inside pack subfolders. On the first
+scan, the first discovered preset can start while the rest of the library is scanned. Missing
+`presets/` and `textures/` folders are created independently; an empty or missing texture folder
+does not prevent preset loading. Existing textures are available to presets that reference them.
+If there are no `.milk` presets, the app asks you to add them to `MilkDropApp/presets/`, even if
+textures are already present.
 
 Favourite and hidden presets are kept next to them, in `MilkDropApp/favourites.txt` and
 `MilkDropApp/hidden.txt`: one preset per line, relative to `MilkDropApp/presets`. They survive
