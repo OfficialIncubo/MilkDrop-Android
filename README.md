@@ -31,7 +31,7 @@ For the optimized, installable release APK, see [Docs/RELEASE_BUILD.md](Docs/REL
 GitHub Actions builds the release APK on pushes, pull requests, and manual runs of **Build
 Android APK**, fetching the latest projectM `master` on each run and logging the commit used.
 After a successful run, download **MilkDrop-build** from the run's **Artifacts**
-section and extract `app-release.apk`. CI uses the project's debug signing configuration;
+section and extract `MilkDrop-build.apk`. CI uses the project's debug signing configuration;
 each fresh runner creates its own key, so installing over a local build or an earlier CI build
 may require uninstalling the existing app first.
 
