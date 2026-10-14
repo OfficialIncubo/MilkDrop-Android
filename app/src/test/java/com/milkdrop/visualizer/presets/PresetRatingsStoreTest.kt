@@ -63,4 +63,82 @@ class PresetRatingsStoreTest {
         assertEquals(emptySet<String>(), store.loadFavourites())
         assertFalse(File(root, "favourites.txt.tmp").exists())
     }
+
+    @Test
+    fun `denied storage access preserves ratings and loads them after permission is granted`() {
+        favouritesFile.writeText("A/a.milk\n")
+        hiddenFile.writeText("B/b.milk\n")
+        var accessGranted = false
+        val guarded = PresetRatingsStore(
+            presetsDir, favouritesFile, hiddenFile,
+            canAccessFiles = { accessGranted },
+            writeExecutor = { it.run() },
+        )
+        assertEquals(emptySet<String>(), guarded.loadFavourites())
+        assertEquals(emptySet<String>(), guarded.loadHidden())
+        guarded.save(emptySet(), emptySet())
+        assertEquals("A/a.milk\n", favouritesFile.readText())
+        assertEquals("B/b.milk\n", hiddenFile.readText())
+
+        accessGranted = true
+        assertEquals(setOf(preset("A/a.milk")), guarded.loadFavourites())
+        assertEquals(setOf(preset("B/b.milk")), guarded.loadHidden())
+    }
+
+    @Test
+    fun `queued writes are skipped if storage permission is revoked`() {
+        favouritesFile.writeText("A/a.milk\n")
+        var accessGranted = true
+        val pending = mutableListOf<Runnable>()
+        val guarded = PresetRatingsStore(
+            presetsDir, favouritesFile, hiddenFile,
+            canAccessFiles = { accessGranted },
+            writeExecutor = { pending.add(it) },
+        )
+        guarded.save(emptySet(), emptySet())
+        accessGranted = false
+        pending.forEach { it.run() }
+        assertEquals("A/a.milk\n", favouritesFile.readText())
+    }
+
+    @Test
+    fun `file read failures do not crash startup`() {
+        // Make isFile succeed but opening the path fail, as it does for Android EACCES.
+        val unreadable = object : File(root, "unreadable") {
+            override fun isFile(): Boolean = true
+        }
+        unreadable.mkdir()
+        val errors = mutableListOf<Exception>()
+        val guarded = PresetRatingsStore(
+            presetsDir, unreadable, hiddenFile,
+            onFileError = { _, error -> errors.add(error) },
+            writeExecutor = { it.run() },
+        )
+        assertEquals(emptySet<String>(), guarded.loadFavourites())
+        assertEquals(1, errors.size)
+        assertTrue(errors.single() is java.io.IOException)
+    }
+
+    @Test
+    fun `security exceptions do not crash startup`() {
+        val unreadable = object : File(root, "unreadable") {
+            override fun isFile(): Boolean = throw SecurityException("Permission denied")
+        }
+        val guarded = PresetRatingsStore(presetsDir, unreadable, hiddenFile) { it.run() }
+        assertEquals(emptySet<String>(), guarded.loadFavourites())
+    }
+
+    @Test
+    fun `write failures are reported without terminating the executor`() {
+        val unavailable = File(root, "missing/favourites.txt")
+        val errors = mutableListOf<Exception>()
+        val guarded = PresetRatingsStore(
+            presetsDir, unavailable, hiddenFile,
+            onFileError = { _, error -> errors.add(error) },
+            writeExecutor = { it.run() },
+        )
+        guarded.save(setOf(preset("A/a.milk")), emptySet())
+        assertEquals(1, errors.size)
+        assertTrue(hiddenFile.isFile)
+    }
 }

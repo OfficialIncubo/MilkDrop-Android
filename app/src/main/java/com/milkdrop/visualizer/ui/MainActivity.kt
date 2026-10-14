@@ -63,6 +63,8 @@ class MainActivity : AppCompatActivity() {
     private var presetDurationIndex = 1
     private var beatCutsEnabled = false
     private lateinit var ratings: PresetRatings
+    private lateinit var ratingsStore: PresetRatingsStore
+    private var hadStorageAccess = false
 
     /** Every scanned preset, hidden ones included; the playlist is this minus the hidden ones. */
     private var allPresetPaths: List<String> = emptyList()
@@ -118,8 +120,12 @@ class MainActivity : AppCompatActivity() {
 
         settings = AppSettings(this)
         // Two small files, read once here; writes go to the background executor.
-        val ratingsStore = PresetRatingsStore(
-            PresetPaths.presetsDir, PresetPaths.favouritesFile, PresetPaths.hiddenFile, ratingsWriter,
+        hadStorageAccess = hasAllFilesAccess()
+        ratingsStore = PresetRatingsStore(
+            PresetPaths.presetsDir, PresetPaths.favouritesFile, PresetPaths.hiddenFile,
+            canAccessFiles = ::hasAllFilesAccess,
+            onFileError = { file, error -> Log.w(TAG, "Unable to access ${file.name}", error) },
+            writeExecutor = ratingsWriter,
         )
         ratings = PresetRatings(ratingsStore.loadFavourites(), ratingsStore.loadHidden(), ratingsStore::save)
         autoAdvanceEnabled = settings.autoAdvanceEnabled
@@ -131,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         qualityIndex = settings.qualityIndex
         restoreControlStates()
 
-        PresetPaths.ensureDirsExist()
+        if (hadStorageAccess) PresetPaths.ensureDirsExist()
 
         surfaceView = MilkDropSurfaceView(this, PresetPaths.texturesDir)
         surfaceView.milkDropRenderer.onInitializationFailed = {
@@ -210,6 +216,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         renderer.onPresetsReady = { runOnUiThread { setStatusMessage(null) } }
+        if (!hasAllFilesAccess()) {
+            setStatusMessage(R.string.presets_need_access)
+            return
+        }
         setStatusMessage(R.string.presets_loading)
 
         val cache = PresetListCache(File(filesDir, PRESET_CACHE_FILE))
@@ -362,6 +372,14 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         surfaceView.onResume()
+        val storageAccess = hasAllFilesAccess()
+        if (storageAccess && !hadStorageAccess) {
+            PresetPaths.ensureDirsExist()
+            ratings = PresetRatings(ratingsStore.loadFavourites(), ratingsStore.loadHidden(), ratingsStore::save)
+            updateFavouriteButton()
+            loadPresetsInBackground()
+        }
+        hadStorageAccess = storageAccess
     }
 
     override fun onPause() {

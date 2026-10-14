@@ -91,6 +91,11 @@ background and picks up added or removed presets automatically.
 
 ## Troubleshooting startup
 
+After reinstalling, grant **All files access** again. Existing files in `MilkDropApp/` survive
+uninstalling, but the storage permission does not. The app defers reading presets and ratings
+until access is granted, then reloads them when you return from Settings. A denied file read
+does not prevent startup, and ratings are not saved while storage access is denied.
+
 If native library loading or projectM graphics initialization fails, the app shows **Unable to
 start visuals on this device.** It stops rendering instead of using an invalid native instance.
 projectM startup diagnostics are forwarded to Android Logcat under the `projectM` tag; library
