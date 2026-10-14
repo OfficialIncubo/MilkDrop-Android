@@ -1,56 +1,84 @@
 package com.milkdrop.visualizer.audio
 
 import android.media.audiofx.Visualizer
+import android.os.Process
+import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Phone audio without the screen-capture prompt, via the Visualizer effect on the output mix.
  *
- * Coarser than playback capture: 8-bit snapshots of the latest ~1024 samples, ~20 times a second,
- * rather than a continuous stream. Normalized scaling keeps it independent of the volume setting.
+ * Polls the latest 8-bit snapshot on an audio-priority thread rather than waiting for rate-limited
+ * callbacks on the UI looper. Normalized scaling keeps it independent of the volume setting.
  * Apps that block capture (DRM video, some streaming apps) come through as silence.
  */
 class OutputMixAudioSource(private val sink: PcmSink) : AudioSource {
 
-    private var visualizer: Visualizer? = null
+    private var capture: Capture? = null
 
     /** Throws if the platform refuses (no output-mix access on this device, or it's in use). */
     override fun start() {
+        if (capture != null) return
         val captureSize = Visualizer.getCaptureSizeRange()[1]
-        val samples = ShortArray(captureSize)
         val effect = Visualizer(OUTPUT_MIX_SESSION)
         try {
-            effect.captureSize = captureSize
-            effect.scalingMode = Visualizer.SCALING_MODE_NORMALIZED
-            effect.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                override fun onWaveFormDataCapture(visualizer: Visualizer, waveform: ByteArray, samplingRate: Int) {
-                    val count = minOf(waveform.size, samples.size)
-                    for (i in 0 until count) {
-                        // Unsigned 8-bit, 128 = silence, to signed 16-bit.
-                        samples[i] = (((waveform[i].toInt() and 0xFF) - 128) shl 8).toShort()
-                    }
-                    sink(samples, count, MONO)
-                }
-
-                override fun onFftDataCapture(visualizer: Visualizer, fft: ByteArray, samplingRate: Int) = Unit
-            }, Visualizer.getMaxCaptureRate(), true, false)
-            effect.enabled = true
+            check(effect.setCaptureSize(captureSize) == Visualizer.SUCCESS)
+            check(effect.setScalingMode(Visualizer.SCALING_MODE_NORMALIZED) == Visualizer.SUCCESS)
+            check(effect.setEnabled(true) == Visualizer.SUCCESS)
+            val session = Capture(effect, captureSize, sink)
+            session.thread.start()
+            capture = session
         } catch (e: RuntimeException) {
             effect.release()
             throw e
         }
-        visualizer = effect
     }
 
     override fun stop() {
-        visualizer?.run {
-            enabled = false
-            release()
-        }
-        visualizer = null
+        val session = capture ?: return
+        capture = null
+        session.running.set(false)
+        session.thread.interrupt()
+        session.thread.join(500)
+        // The worker releases its effect, even if a platform call takes longer than the join.
+    }
+
+    private class Capture(effect: Visualizer, captureSize: Int, sink: PcmSink) {
+        val running = AtomicBoolean(true)
+        val thread = Thread({
+            val waveform = ByteArray(captureSize)
+            val samples = ShortArray(captureSize)
+            try {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
+                while (running.get()) {
+                    val status = effect.getWaveForm(waveform)
+                    if (status != Visualizer.SUCCESS) {
+                        Log.w(TAG, "Output mix capture failed: $status")
+                        break
+                    }
+                    for (i in waveform.indices) {
+                        // Unsigned 8-bit, 128 = silence, to signed 16-bit.
+                        samples[i] = (((waveform[i].toInt() and 0xFF) - 128) shl 8).toShort()
+                    }
+                    if (running.get()) sink(samples, captureSize, MONO)
+                    // Poll fresh data after a stall; never queue snapshots to replay later.
+                    Thread.sleep(POLL_INTERVAL_MS)
+                }
+            } catch (_: InterruptedException) {
+                // Normal stop: wake the sleeping worker immediately.
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Output mix capture stopped", e)
+            } finally {
+                running.set(false)
+                effect.release()
+            }
+        }, "milkdrop-output-mix")
     }
 
     private companion object {
         const val OUTPUT_MIX_SESSION = 0
         const val MONO = 1
+        const val POLL_INTERVAL_MS = 5L
+        const val TAG = "OutputMixAudioSource"
     }
 }

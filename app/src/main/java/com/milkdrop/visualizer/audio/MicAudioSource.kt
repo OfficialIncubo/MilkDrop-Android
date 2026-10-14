@@ -23,7 +23,7 @@ class MicAudioSource(
             SAMPLE_RATE_HZ,
             CHANNEL_CONFIG,
             ENCODING,
-            minBufferSize * 2,
+            minBufferSize,
         )
         val thread = PcmCaptureThread(audioRecord, CHANNELS, sink)
         captureThread = thread
@@ -32,12 +32,17 @@ class MicAudioSource(
 
     /**
      * The plain MIC source is tuned for voice: auto-gain and noise suppression flatten music and
-     * smear its beats. UNPROCESSED skips that, where the phone supports it.
+     * smear its beats. UNPROCESSED skips that, where the phone supports it; voice recognition
+     * is the fallback recommended for capture without automatic gain or noise suppression.
      */
     private fun micInput(): Int {
         val audioManager = context.getSystemService(AudioManager::class.java)
         val unprocessed = audioManager.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED)
-        return if (unprocessed == "true") MediaRecorder.AudioSource.UNPROCESSED else MediaRecorder.AudioSource.MIC
+        return if (unprocessed == "true") {
+            MediaRecorder.AudioSource.UNPROCESSED
+        } else {
+            MediaRecorder.AudioSource.VOICE_RECOGNITION
+        }
     }
 
     override fun stop() {
