@@ -15,10 +15,25 @@ git submodule update --init --recursive
 ```
 
 The native build compiles `libprojectM` and `libprojectM_playlist` from source (vendored as a
-git submodule at `native/projectm`, pinned to a released 4.1.x tag) rather than using a
+git submodule at `native/projectm`, tracking upstream `master`) rather than using a
 prebuilt binary, so presets/API stay in sync with that exact version.
 
+Normal submodule initialization uses the commit recorded in this repository. To update to the
+latest upstream `master` locally, run:
+
+```bash
+git submodule update --init --remote native/projectm
+git -C native/projectm submodule update --init --recursive
+```
+
 For the optimized, installable release APK, see [Docs/RELEASE_BUILD.md](Docs/RELEASE_BUILD.md).
+
+GitHub Actions builds the release APK on pushes, pull requests, and manual runs of **Build
+Android APK**, fetching the latest projectM `master` on each run and logging the commit used.
+After a successful run, download **MilkDrop-build** from the run's **Artifacts**
+section and extract `app-release.apk`. CI uses the project's debug signing configuration;
+each fresh runner creates its own key, so installing over a local build or an earlier CI build
+may require uninstalling the existing app first.
 
 ## Setting up presets
 

@@ -4,7 +4,7 @@ project(milkdropjni)
 # Build libprojectM (and projectm-playlist, same repo) from source as a
 # dynamically-linked shared library, per the project requirements — this
 # keeps LGPL-2.1 compliance simple and keeps presets/API in sync with the
-# vendored submodule tag rather than a prebuilt CI artifact.
+# vendored submodule source rather than a prebuilt CI artifact.
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 set(ENABLE_PLAYLIST ON CACHE BOOL "" FORCE)
 set(ENABLE_SDL_UI OFF CACHE BOOL "" FORCE)
@@ -18,8 +18,8 @@ get_filename_component(PROJECTM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../
 # project() sets — i.e. this wrapper, not projectM — so a fresh configure left them empty and
 # ProjectMCWrapper.cpp failed to compile. Mirror the submodule's own declared version instead.
 file(READ ${PROJECTM_SOURCE_DIR}/CMakeLists.txt PROJECTM_CMAKE_CONTENT)
-string(REGEX MATCH "project\\(libprojectM[^)]*VERSION ([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ "${PROJECTM_CMAKE_CONTENT}")
-if(NOT CMAKE_MATCH_3)
+string(REGEX MATCH "project\\(libprojectM[^)]*VERSION ([0-9]+)\\.([0-9]+)\\.([0-9]+)" PROJECTM_VERSION_DECLARATION "${PROJECTM_CMAKE_CONTENT}")
+if(NOT PROJECTM_VERSION_DECLARATION)
     message(FATAL_ERROR "Couldn't read libprojectM's version from its CMakeLists.txt.")
 endif()
 set(CMAKE_PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
@@ -119,12 +119,13 @@ mirror_projectm_dir(hlslparser vendor/hlslparser/src)
 #   constructing a *named* locale re-initialises all its facets (time_get format analysis, getenv,
 #   allocations), which profiled at a large share of each preset switch's GL-thread stall.
 #   std::locale::classic() is the same "C" locale as a shared static instance.
-# - It reports parse errors (line and reason) with vprintf, which goes nowhere on Android; send
-#   them to logcat instead.
+# - Its parser error logging hook is disabled upstream; send the formatted line and reason to
+#   logcat instead.
 patch_projectm_source(hlslparser vendor/hlslparser/src/Engine.cpp
     "std::locale(\"C\")" "std::locale::classic()"
     "void Log_ErrorArgList(" "#include <android/log.h>\nvoid Log_ErrorArgList("
-    "vprintf( format, args );" "__android_log_vprint(ANDROID_LOG_WARN, \"MilkDropShader\", format, args);"
+    "//LOG_ERROR(\"[HLSLParser] \" + std::string(buffer.data()));"
+    "__android_log_print(ANDROID_LOG_WARN, \"MilkDropShader\", \"%s\", buffer.data());"
 )
 # Its errors only give a line number in projectM's internally rewritten source; add the source text
 # at the error so the failing construct can be read straight from logcat.
@@ -156,18 +157,18 @@ patch_projectm_source(hlslparser vendor/hlslparser/src/HLSLParser.cpp
         INTRINSIC_FLOAT1_FUNCTION( "tanh" ),
         INTRINSIC_FLOAT1_FUNCTION( "sinh" ),
         INTRINSIC_FLOAT1_FUNCTION( "cosh" ),]=]
-    [=[                sourcePreprocessed.append("(");
-                sourcePreprocessed.append(m_macros[i]->value);
-                sourcePreprocessed.append(")");]=]
-    [=[                const char* value = m_macros[i]->value;
-                bool isPlainName = isalpha(value[0]) || value[0] == '_';
-                for (const char* c = value; *c != 0 && isPlainName; ++c)
-                {
-                    isPlainName = isalnum(*c) || *c == '_' || *c == '.';
-                }
-                sourcePreprocessed.append(isPlainName ? " " : "(");
-                sourcePreprocessed.append(value);
-                sourcePreprocessed.append(isPlainName ? " " : ")");]=]
+    [=[                    sourcePreprocessed.append("(");
+                    sourcePreprocessed.append(m_macros[i]->value);
+                    sourcePreprocessed.append(")");]=]
+    [=[                    const char* value = m_macros[i]->value;
+                    bool isPlainName = isalpha(value[0]) || value[0] == '_';
+                    for (const char* c = value; *c != 0 && isPlainName; ++c)
+                    {
+                        isPlainName = isalnum(*c) || *c == '_' || *c == '.';
+                    }
+                    sourcePreprocessed.append(isPlainName ? " " : "(");
+                    sourcePreprocessed.append(value);
+                    sourcePreprocessed.append(isPlainName ? " " : ")");]=]
     [=[        DeclareVariable( declaration2->name, declaration2->type );
 
         // Handle option assignment of the declared variables(s).
@@ -264,18 +265,26 @@ patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/Constants.hp
 )
 
 # projectM silently falls back to a default shader (or none) when a preset's warp/composite shader
-# fails to translate or compile; the reason is only printed in MILKDROP_PRESET_DEBUG builds, to
-# stderr. Log it to logcat, without the full shader source projectM appends to translation errors.
+# fails to translate or compile. Forward these errors directly to logcat even without an
+# application logging callback, omitting any full shader source appended to the message.
 set(SHADER_ERROR_LOG [=[__android_log_print(ANDROID_LOG_WARN, "MilkDropShader", "%s shader: %s", STAGE, ex.message().substr(0, ex.message().find("\nSource:")).c_str())]=])
-set(SHADER_STAGES composite warp)
-set(SHADER_STAGE_FILES FinalComposite PerPixelMesh)
-foreach(STAGE FILE_NAME IN ZIP_LISTS SHADER_STAGES SHADER_STAGE_FILES)
-    string(REPLACE "STAGE" "\"${STAGE}\"" STAGE_LOG "${SHADER_ERROR_LOG}")
-    patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/${FILE_NAME}.cpp
-        "#include \"${FILE_NAME}.hpp\"" "#include \"${FILE_NAME}.hpp\"\n#include <android/log.h>"
-        "(void)ex; // silence unused parameter warning" "${STAGE_LOG};"
-    )
-endforeach()
+string(REPLACE "STAGE" "\"composite\"" COMPOSITE_LOG "${SHADER_ERROR_LOG}")
+patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/FinalComposite.cpp
+    "#include \"FinalComposite.hpp\"" "#include \"FinalComposite.hpp\"\n#include <android/log.h>"
+    [=[LOG_WARN("[FinalComposite] Error loading composite warp shader code: " + ex.message() + " - Using fallback shader.");]=]
+    "${COMPOSITE_LOG};"
+    [=[LOG_WARN("[FinalComposite] Error compiling composite warp shader code - Using fallback shader.");]=]
+    "${COMPOSITE_LOG};"
+)
+string(REPLACE "STAGE" "\"warp\"" WARP_LOG "${SHADER_ERROR_LOG}")
+patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/PerPixelMesh.cpp
+    "#include \"PerPixelMesh.hpp\"" "#include \"PerPixelMesh.hpp\"\n#include <android/log.h>"
+    [=[LOG_ERROR("[PerPixelMesh] Error loading warp shader code:" + ex.message());]=]
+    "${WARP_LOG};"
+    "catch (Renderer::ShaderException&)" "catch (Renderer::ShaderException& ex)"
+    [=[LOG_ERROR("[PerPixelMesh] Error compiling warp shader code.");]=]
+    "${WARP_LOG};"
+)
 
 # MilkDrop 3 additions to preset shaders (one call: each call re-reads the original file):
 # - get_fft(pos) and get_fft_hz(freq): the spectrum level (0-1) at a position along 0-22 kHz, or at
