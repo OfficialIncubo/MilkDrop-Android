@@ -3,9 +3,11 @@
 #include <sched.h>
 #include <cerrno>
 #include <exception>
+#include <memory>
 #include <vector>
 
 #include <projectM-4/projectM.h>
+#include <projectM-4/logging.h>
 #include <projectM-4/playlist_callbacks.h>
 #include <projectM-4/playlist_core.h>
 #include <projectM-4/playlist_items.h>
@@ -16,10 +18,22 @@ namespace {
 struct BridgeHandle {
     projectm_handle projectM = nullptr;
     projectm_playlist_handle playlist = nullptr;
+
+    ~BridgeHandle() {
+        if (playlist != nullptr) projectm_playlist_destroy(playlist);
+        if (projectM != nullptr) projectm_destroy(projectM);
+    }
 };
 
 BridgeHandle* AsHandle(jlong handle) {
     return reinterpret_cast<BridgeHandle*>(handle);
+}
+
+void OnProjectMLog(const char* message, projectm_log_level level, void*) {
+    int priority = ANDROID_LOG_INFO;
+    if (level >= PROJECTM_LOG_LEVEL_ERROR) priority = ANDROID_LOG_ERROR;
+    else if (level == PROJECTM_LOG_LEVEL_WARN) priority = ANDROID_LOG_WARN;
+    __android_log_print(priority, "projectM", "%s", message != nullptr ? message : "");
 }
 
 // projectM's C API is not always exception-safe at its own boundary — e.g. loading "idle://"
@@ -65,12 +79,25 @@ extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeCreate(JNIEnv*, jobject) {
-    auto* handle = new BridgeHandle();
-    handle->projectM = projectm_create();
-    handle->playlist = projectm_playlist_create(handle->projectM);
-    projectm_playlist_set_preset_switch_failed_event_callback(handle->playlist, &OnPresetSwitchFailed, nullptr);
-    projectm_playlist_set_preset_switched_event_callback(handle->playlist, &OnPresetSwitched, nullptr);
-    return reinterpret_cast<jlong>(handle);
+    return SafeCallOr<jlong>(0, [] {
+        // Master reports loader/context failures through its log callback and may return null.
+        projectm_set_log_callback(&OnProjectMLog, false, nullptr);
+        projectm_set_log_level(PROJECTM_LOG_LEVEL_INFO, false);
+        auto handle = std::make_unique<BridgeHandle>();
+        handle->projectM = projectm_create();
+        if (handle->projectM == nullptr) {
+            __android_log_print(ANDROID_LOG_ERROR, "MilkDropJNI", "projectM initialization failed; see projectM logs");
+            return jlong{0};
+        }
+        handle->playlist = projectm_playlist_create(handle->projectM);
+        if (handle->playlist == nullptr) {
+            __android_log_print(ANDROID_LOG_ERROR, "MilkDropJNI", "projectM playlist initialization failed");
+            return jlong{0};
+        }
+        projectm_playlist_set_preset_switch_failed_event_callback(handle->playlist, &OnPresetSwitchFailed, nullptr);
+        projectm_playlist_set_preset_switched_event_callback(handle->playlist, &OnPresetSwitched, nullptr);
+        return reinterpret_cast<jlong>(handle.release());
+    });
 }
 
 JNIEXPORT void JNICALL
@@ -79,8 +106,6 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeDestroy(JNIEnv*, jobjec
     if (handle == nullptr) {
         return;
     }
-    projectm_playlist_destroy(handle->playlist);
-    projectm_destroy(handle->projectM);
     delete handle;
 }
 

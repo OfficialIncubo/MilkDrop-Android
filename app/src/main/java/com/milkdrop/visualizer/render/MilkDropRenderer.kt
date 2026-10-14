@@ -95,6 +95,10 @@ class MilkDropRenderer(
     @Volatile
     var onPresetsReady: (() -> Unit)? = null
 
+    /** Called when native libraries or the device's graphics context cannot initialize projectM. */
+    @Volatile
+    var onInitializationFailed: (() -> Unit)? = null
+
     /** Latest list handed over by [loadScannedPresets]; applied on the GL thread when it changes. */
     @Volatile
     private var presetPaths: List<String> = emptyList()
@@ -119,7 +123,17 @@ class MilkDropRenderer(
         // instance owned is gone, so rebuild projectM from scratch rather than rendering garbage.
         release()
 
-        handle = ProjectMBridge.nativeCreate()
+        handle = try {
+            ProjectMBridge.nativeCreate()
+        } catch (e: LinkageError) {
+            Log.e(TAG, "Unable to load projectM native libraries", e)
+            0L
+        }
+        if (handle == 0L) {
+            Log.e(TAG, "Unable to initialize projectM")
+            onInitializationFailed?.invoke()
+            return
+        }
         GpuDriverThreads.pinToFastCores()
         performanceHints.onRenderThreadStarted()
         ProjectMBridge.nativeSetTextureSearchPaths(handle, arrayOf(texturesDir.absolutePath))
@@ -154,10 +168,11 @@ class MilkDropRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        ProjectMBridge.nativeSetWindowSize(handle, width, height)
+        if (handle != 0L) ProjectMBridge.nativeSetWindowSize(handle, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        if (handle == 0L) return
         val frameStartNanos = System.nanoTime()
         performanceHints.onFrameStart(frameStartNanos)
         applyPendingState()

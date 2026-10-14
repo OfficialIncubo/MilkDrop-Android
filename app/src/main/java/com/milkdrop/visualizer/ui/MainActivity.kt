@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     /** Loading/error message for the top label; while set, it shows instead of the preset name. */
     @StringRes
     private var statusMessage: Int? = R.string.presets_loading
+    private var visualizationFailed = false
     private var currentPresetName: String? = null
     private val hidePresetName = Runnable { updateTopLabel() }
     private var presetNameShownUntil = 0L
@@ -133,6 +134,12 @@ class MainActivity : AppCompatActivity() {
         PresetPaths.ensureDirsExist()
 
         surfaceView = MilkDropSurfaceView(this, PresetPaths.texturesDir)
+        surfaceView.milkDropRenderer.onInitializationFailed = {
+            runOnUiThread {
+                visualizationFailed = true
+                setStatusMessage(R.string.visualization_initialization_failed)
+            }
+        }
         binding.surfaceContainer.addView(surfaceView)
         applyRestoredRenderSettings()
 
@@ -249,7 +256,7 @@ class MainActivity : AppCompatActivity() {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
     private fun setStatusMessage(@StringRes message: Int?) {
-        statusMessage = message
+        statusMessage = if (visualizationFailed) R.string.visualization_initialization_failed else message
         updateTopLabel()
     }
 

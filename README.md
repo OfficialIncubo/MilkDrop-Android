@@ -89,6 +89,23 @@ All settings, and the preset that was showing, are remembered across launches. T
 is cached, so the app resumes within a moment of opening; it rescans the presets folder in the
 background and picks up added or removed presets automatically.
 
+## Troubleshooting startup
+
+If native library loading or projectM graphics initialization fails, the app shows **Unable to
+start visuals on this device.** It stops rendering instead of using an invalid native instance.
+projectM startup diagnostics are forwarded to Android Logcat under the `projectM` tag; library
+loading and initialization failures are also logged under `MilkDropRenderer` and `MilkDropJNI`.
+
+With the phone connected over adb, reproduce the issue and then save the log:
+
+```bash
+adb logcat -d > milkdrop-logcat.txt
+```
+
+Include the log, phone model, Android version, and selected audio source when reporting a crash.
+Since CI fetches upstream `master` on every run, include the projectM commit shown in the CI log
+as well. This helps distinguish a native startup failure from an audio or preset loading issue.
+
 ## Licensing note
 
 `libprojectM` and `projectm-playlist` are LGPL-2.1; this app links them as dynamically-loaded
