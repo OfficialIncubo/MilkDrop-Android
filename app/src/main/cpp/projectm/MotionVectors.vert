@@ -4,6 +4,7 @@ precision highp sampler2D;
 layout(location = 0) in vec2 vertex_position;
 layout(location = 1) in vec4 vertex_color;
 
+uniform mat4 vertex_transformation;
 uniform float length_multiplier;
 uniform float minimum_length;
 uniform sampler2D warp_coordinates;
@@ -41,8 +42,10 @@ void main()
         endpoint += delta;
     }
 
-    // These are already clip coordinates, exactly as in BeatDrop's WFVERTEX output.
-    // Applying projectM's orthogonal projection here would invert Y a second time.
-    gl_Position = vec4(endpoint.x * 2.0 - 1.0, -(endpoint.y * 2.0 - 1.0), 0.0, 1.0);
+    // Match BeatDrop's WFVERTEX, then its fixed-function projection. PrepareFor2DDrawing()
+    // uses OrthoLH(2, -2), which flips Y; projectM's orthogonalProjection does the same.
+    // Skipping that projection draws the vector on the opposite row from its UV lookup.
+    vec2 vertex = vec2(endpoint.x * 2.0 - 1.0, -(endpoint.y * 2.0 - 1.0));
+    gl_Position = vertex_transformation * vec4(vertex, 0.0, 1.0);
     fragment_color = vertex_color;
 }

@@ -21,9 +21,6 @@ patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/MotionVector
     float const minimumLength = 1.0f / static_cast<float>(motionTexture->Width());]=]
     [=[    m_motionVectorMesh.SetVertexCount(static_cast<std::size_t>(countX + 1) * 2); // countX + 1 lines for each grid row, 2 vertices each.]=]
     [=[    m_motionVectorMesh.SetVertexCount(static_cast<std::size_t>(countX) * 2);]=]
-    [=[    shader->SetUniformMat4x4("vertex_transformation", PresetState::orthogonalProjection);
-]=]
-    ""
     [=[staticShaders->GetPresetMotionVectorsVertexShader()]=]
     [=[milkdrop::MotionVectorVertexShader]=]
     [=[            // Draw a row of lines.
