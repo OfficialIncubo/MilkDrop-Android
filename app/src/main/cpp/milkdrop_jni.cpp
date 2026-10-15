@@ -2,8 +2,10 @@
 #include <android/log.h>
 #include <sched.h>
 #include <cerrno>
+#include <cstring>
 #include <exception>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <projectM-4/projectM.h>
@@ -11,6 +13,7 @@
 #include <projectM-4/playlist_callbacks.h>
 #include <projectM-4/playlist_core.h>
 #include <projectM-4/playlist_items.h>
+#include <projectM-4/playlist_memory.h>
 #include <projectM-4/playlist_playback.h>
 
 namespace {
@@ -18,6 +21,8 @@ namespace {
 struct BridgeHandle {
     projectm_handle projectM = nullptr;
     projectm_playlist_handle playlist = nullptr;
+    // Written only by successful playlist switch callbacks on the GL thread.
+    std::string activePresetPath;
 
     ~BridgeHandle() {
         if (playlist != nullptr) projectm_playlist_destroy(playlist);
@@ -68,7 +73,11 @@ void OnPresetSwitchFailed(const char* presetFilename, const char* message, void*
                         message != nullptr ? message : "?");
 }
 
-void OnPresetSwitched(bool isHardCut, unsigned int index, void*) {
+void OnPresetSwitched(bool isHardCut, unsigned int index, void* userData) {
+    auto* handle = static_cast<BridgeHandle*>(userData);
+    std::unique_ptr<char, decltype(&projectm_playlist_free_string)> path(
+        projectm_playlist_item(handle->playlist, index), &projectm_playlist_free_string);
+    if (path) handle->activePresetPath = path.get();
     __android_log_print(ANDROID_LOG_DEBUG, "MilkDropJNI", "Switched to #%u (%s)", index,
                         isHardCut ? "hard cut" : "soft cut");
 }
@@ -95,7 +104,7 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeCreate(JNIEnv*, jobject
             return jlong{0};
         }
         projectm_playlist_set_preset_switch_failed_event_callback(handle->playlist, &OnPresetSwitchFailed, nullptr);
-        projectm_playlist_set_preset_switched_event_callback(handle->playlist, &OnPresetSwitched, nullptr);
+        projectm_playlist_set_preset_switched_event_callback(handle->playlist, &OnPresetSwitched, handle.get());
         return reinterpret_cast<jlong>(handle.release());
     });
 }
@@ -250,6 +259,40 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeGetPlaylistPosition(JNI
     projectm_playlist_handle playlist = AsHandle(handlePtr)->playlist;
     // Throws PlaylistEmptyException on an empty playlist.
     return SafeCallOr<jint>(0, [&] { return static_cast<jint>(projectm_playlist_get_position(playlist)); });
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeGetCurrentPresetPath(
+        JNIEnv* env, jobject, jlong handlePtr) {
+    const auto& path = AsHandle(handlePtr)->activePresetPath;
+    return path.empty() ? nullptr : env->NewStringUTF(path.c_str());
+}
+
+// Kotlin's list is stable, but projectM removes failed presets from its own playlist. Resolve
+// selections by filename at the time of the request instead of reusing an obsolete native index.
+JNIEXPORT jint JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativePlayPresetPath(
+        JNIEnv* env, jobject, jlong handlePtr, jstring path, jboolean hardCut) {
+    const char* target = env->GetStringUTFChars(path, nullptr);
+    if (target == nullptr) return -1;
+    const jint position = SafeCallOr<jint>(-1, [&] {
+        const auto playlist = AsHandle(handlePtr)->playlist;
+        std::unique_ptr<char*, decltype(&projectm_playlist_free_string_array)> items(
+            projectm_playlist_items(playlist, 0, projectm_playlist_size(playlist)),
+            &projectm_playlist_free_string_array);
+        if (!items) return jint{-1};
+        for (uint32_t index = 0; items.get()[index] != nullptr; ++index) {
+            if (std::strcmp(items.get()[index], target) == 0) {
+                return static_cast<jint>(projectm_playlist_set_position(playlist, index, hardCut == JNI_TRUE));
+            }
+        }
+        // A previously failed file stays selectable in the UI. Reinsert it for an explicit retry.
+        const uint32_t index = projectm_playlist_size(playlist);
+        if (!projectm_playlist_add_preset(playlist, target, true)) return jint{-1};
+        return static_cast<jint>(projectm_playlist_set_position(playlist, index, hardCut == JNI_TRUE));
+    });
+    env->ReleaseStringUTFChars(path, target);
+    return position;
 }
 
 JNIEXPORT void JNICALL

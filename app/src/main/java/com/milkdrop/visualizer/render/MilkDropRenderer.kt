@@ -29,7 +29,7 @@ class MilkDropRenderer(
     sealed interface Navigation {
         data object Next : Navigation
         data object Previous : Navigation
-        data class JumpTo(val position: Int) : Navigation
+        data class JumpTo(val path: String) : Navigation
     }
 
     data class MeshSize(val columns: Int, val rows: Int) {
@@ -117,7 +117,7 @@ class MilkDropRenderer(
     @Volatile
     private var loadedPaths: List<String>? = null
 
-    private var lastReportedPosition = -1
+    private var lastReportedPath: String? = null
 
     private val frameRateMeter = FrameRateMeter()
     private var reportedFps = 0
@@ -156,7 +156,7 @@ class MilkDropRenderer(
         // Until a preset list is handed over (see loadScannedPresets), projectM just shows its
         // built-in idle preset.
         loadedPaths = null
-        lastReportedPosition = -1
+        lastReportedPath = null
         frameRateMeter.reset()
         reportedFps = 0
         applyPendingState()
@@ -203,14 +203,12 @@ class MilkDropRenderer(
 
     /** Covers auto-advance too, which projectM does internally without going through [navigate]. */
     private fun reportPresetChange() {
-        val paths = loadedPaths ?: return
-        val position = ProjectMBridge.nativeGetPlaylistPosition(handle)
-        if (position != lastReportedPosition) {
-            lastReportedPosition = position
-            paths.getOrNull(position)?.let { path ->
-                startPresetPath = path
-                onPresetChanged?.invoke(path)
-            }
+        if (loadedPaths == null) return
+        val path = ProjectMBridge.nativeGetCurrentPresetPath(handle) ?: return
+        if (path != lastReportedPath) {
+            lastReportedPath = path
+            startPresetPath = path
+            onPresetChanged?.invoke(path)
         }
     }
 
@@ -266,7 +264,7 @@ class MilkDropRenderer(
         } else if (paths.isEmpty() && loadedPaths?.isNotEmpty() == true) {
             ProjectMBridge.nativeClearPresets(currentHandle)
             loadedPaths = paths
-            lastReportedPosition = -1
+            lastReportedPath = null
         }
 
         if (loadedPaths?.isNotEmpty() == true) {
@@ -282,12 +280,12 @@ class MilkDropRenderer(
         // search per insert: O(n²) string compares on the GL thread, seconds for ~15k presets.
         ProjectMBridge.nativeAddPresets(currentHandle, paths.toTypedArray(), true)
         loadedPaths = paths
-        lastReportedPosition = -1
+        lastReportedPath = null
 
         // Resuming reloads the preset even when it's the one already showing (after a rescan found
         // changes); the playlist API has no way to re-point its position without loading.
-        val resumeIndex = startPresetPath?.let { paths.indexOf(it) } ?: -1
-        navigate(currentHandle, if (resumeIndex >= 0) Navigation.JumpTo(resumeIndex) else Navigation.Next)
+        val resumePath = startPresetPath?.takeIf { it in paths }
+        navigate(currentHandle, if (resumePath != null) Navigation.JumpTo(resumePath) else Navigation.Next)
         onPresetsReady?.invoke()
     }
 
@@ -297,7 +295,10 @@ class MilkDropRenderer(
         val position = when (navigation) {
             Navigation.Next -> ProjectMBridge.nativePlayNext(currentHandle, hardCut)
             Navigation.Previous -> ProjectMBridge.nativePlayLast(currentHandle, hardCut)
-            is Navigation.JumpTo -> ProjectMBridge.nativeSetPlaylistPosition(currentHandle, navigation.position, hardCut)
+            is Navigation.JumpTo -> {
+                if (navigation.path !in loadedPaths.orEmpty()) return
+                ProjectMBridge.nativePlayPresetPath(currentHandle, navigation.path, hardCut)
+            }
         }
         Log.d(TAG, "$navigation -> #$position loaded in ${SystemClock.elapsedRealtime() - startMs} ms")
     }

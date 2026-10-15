@@ -76,6 +76,11 @@ The preset's name shows at the top while they're up, and for a couple of seconds
 
 The app follows the phone's rotation; in landscape the controls are a single row.
 
+Preset names, favourites, and the resume preset follow the filename confirmed by a successful
+projectM load. If projectM skips and removes a failed preset from its internal playlist, later
+names and list selections still refer to the correct files. Tap a skipped preset in the list
+to explicitly retry it.
+
 ### Settings
 
 - **Auto-advance** — switch preset on a timer; when off, stays on the current preset.

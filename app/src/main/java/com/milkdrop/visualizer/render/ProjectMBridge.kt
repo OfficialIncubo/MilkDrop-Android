@@ -37,5 +37,7 @@ object ProjectMBridge {
     external fun nativeFeedPcmInt16(handle: Long, samples: ShortArray, frameCount: Int, channels: Int)
     external fun nativeSetThreadAffinity(tids: IntArray, cpus: IntArray): Int
     external fun nativeGetPlaylistPosition(handle: Long): Int
+    external fun nativeGetCurrentPresetPath(handle: Long): String?
+    external fun nativePlayPresetPath(handle: Long, path: String, hardCut: Boolean): Int
     external fun nativeSetPlaylistPosition(handle: Long, position: Int, hardCut: Boolean): Int
 }

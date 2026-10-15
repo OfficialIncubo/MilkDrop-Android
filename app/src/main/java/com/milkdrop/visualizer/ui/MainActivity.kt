@@ -541,7 +541,9 @@ class MainActivity : AppCompatActivity() {
         presetAdapter = PresetListAdapter(
             ratings,
             onPresetClick = { entry ->
-                entry.playlistIndex?.let { surfaceView.milkDropRenderer.requestNavigation(Navigation.JumpTo(it)) }
+                if (entry.playlistIndex != null) {
+                    surfaceView.milkDropRenderer.requestNavigation(Navigation.JumpTo(entry.path))
+                }
                 closePlaylistPanel()
             },
             onFavouriteToggled = { entry ->
