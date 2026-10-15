@@ -110,6 +110,8 @@ function(mirror_projectm_dir TARGET DIR_REL)
     target_include_directories(${TARGET} BEFORE PUBLIC ${DST_DIR})
 endfunction()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/BeatAnalysis.cmake)
+
 # hlslparser's headers get patched below, and MilkdropShader.cpp includes them too (through the
 # PUBLIC include dir this prepends), so every user sees the same class layout.
 mirror_projectm_dir(hlslparser vendor/hlslparser/src)

@@ -35,6 +35,29 @@ section and extract `MilkDrop-build.apk`. CI uses the project's debug signing co
 each fresh runner creates its own key, so installing over a local build or an earlier CI build
 may require uninstalling the existing app first.
 
+## Audio reaction
+
+The native projectM build uses adaptive band analysis: bass **20–250 Hz**, mid
+**250–4,000 Hz**, and treble **4,000–20,000 Hz**. Each band learns its recent loudness
+and spectral-change statistics. Sudden attacks receive extra emphasis above the learned
+variation, while steady audio stays near the preset convention of `1.0`. Silent input
+produces zero immediate band values; the `bass_att`, `mid_att`, and `treb_att` values
+decay smoothly. Timing follows elapsed seconds rather than frame counts.
+
+This is applied to build-directory copies of projectM's `Loudness` implementation; the
+submodule, capture modes, permissions, and waveform/spectrum data used by presets are unchanged.
+Frequency boundaries and response times are CMake cache options in
+`app/src/main/cpp/projectm/BeatAnalysis.cmake`; sensitivity is learned automatically rather
+than requiring a fixed input-volume threshold. For example, pass
+`-DMILKDROP_BASS_HIGH_HZ=200` as a native CMake argument to use a 200 Hz crossover.
+
+The frequency reference is 44,100 Hz, matching Mic and Phone audio capture. The existing
+capture interface does not carry sample-rate metadata, so No prompt uses that reference
+too; its physical frequency boundaries may differ if Android's Visualizer uses another
+sample rate. Treble is limited to the analysis Nyquist frequency. The existing short FFT
+window also limits separation of very low bass frequencies; these bands are approximate,
+not sharp audio filters. This analysis cannot recover audio blocked or omitted by capture.
+
 ## Setting up presets
 
 On startup, after storage access is granted, the app creates any missing folders on external
