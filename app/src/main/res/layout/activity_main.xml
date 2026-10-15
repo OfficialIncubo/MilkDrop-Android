@@ -209,14 +209,6 @@
                     android:textSize="16sp" />
 
                 <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="@string/setting_screen_dependent_rendering_description"
-                    android:textColor="@color/overlay_content"
-                    android:textSize="13sp" />
-
-                <TextView
                     style="@style/SettingLabel"
                     android:labelFor="@id/groupPresetDuration"
                     android:text="@string/setting_preset_duration" />
