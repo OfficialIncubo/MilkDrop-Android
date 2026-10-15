@@ -394,6 +394,8 @@ static auto floatRand = ]=]
 #include <cmath>]=]
 )
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ScreenDependentRendering.cmake)
+
 find_library(log-lib log)
 target_link_libraries(projectM PRIVATE ${log-lib})
 

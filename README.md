@@ -104,6 +104,17 @@ projectM load. If projectM skips and removes a failed preset from its internal p
 names and list selections still refer to the correct files. Tap a skipped preset in the list
 to explicitly retry it.
 
+### Shader aspect variables
+
+`aspect` keeps projectM's physical screen aspect in both render modes. `aspect_sd` is a
+new `float4` available in warp and composite shaders: `.xy` contains the effective aspect
+multipliers and `.zw` their inverses. With Screen-Dependent Render Mode on, all four
+components are `1.0`; with it off, `aspect_sd` equals `aspect`.
+
+For example, use `float2 p = (uv - 0.5) * aspect_sd.xy;` for shader coordinates that
+follow the toggle. Existing shaders using `aspect` retain their original correction.
+Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-dependent mode.
+
 ### Settings
 
 - **Auto-advance** — switch preset on a timer; when off, stays on the current preset.
@@ -113,6 +124,9 @@ to explicitly retry it.
 - **Frame rate** — 30, 45, 60 or Max. MilkDrop's motion advances per frame, so presets move
   faster at higher frame rates.
 - **Quality** — render resolution (High / Medium / Low). Low also uses a coarser warp mesh.
+- **Screen-Dependent Render Mode** — fit custom waves, shapes, built-in waves, and per-vertex
+  motion to full-screen coordinates, following BeatDrop's screen-dependent convention. Off by
+  default for standard projectM rendering. Applies immediately and is saved across launches.
 - **Audio source**:
   - *Mic* — the microphone; works with any player and picks up the room.
   - *Phone audio* — what the phone plays, in full detail. Android asks for screen-capture

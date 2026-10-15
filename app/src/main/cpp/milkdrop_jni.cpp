@@ -127,6 +127,13 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetWindowSize(
 }
 
 JNIEXPORT void JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetScreenDependentRendering(
+        JNIEnv*, jobject, jlong handlePtr, jboolean enabled) {
+    // The build patch makes projectM's existing per-instance aspect flag effective.
+    projectm_set_aspect_correction(AsHandle(handlePtr)->projectM, enabled != JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeRenderFrame(JNIEnv*, jobject, jlong handlePtr) {
     projectm_handle projectM = AsHandle(handlePtr)->projectM;
     SafeCall([&] { projectm_opengl_render_frame(projectM); });

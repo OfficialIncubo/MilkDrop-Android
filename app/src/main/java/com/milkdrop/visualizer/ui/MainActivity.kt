@@ -170,6 +170,7 @@ class MainActivity : AppCompatActivity() {
         updatingControls = true
         binding.switchAutoAdvance.isChecked = autoAdvanceEnabled
         binding.switchBeatCuts.isChecked = beatCutsEnabled
+        binding.switchScreenDependentRendering.isChecked = settings.screenDependentRendering
         binding.groupPresetDuration.check(PRESET_DURATION_BUTTON_IDS[presetDurationIndex])
         binding.groupTransition.check(if (hardCutEnabled) R.id.transitionInstant else R.id.transitionSmooth)
         binding.groupFrameRate.check(FPS_BUTTON_IDS[fpsIndex])
@@ -189,6 +190,7 @@ class MainActivity : AppCompatActivity() {
         surfaceView.milkDropRenderer.instantTransitions = hardCutEnabled
         surfaceView.milkDropRenderer.presetDurationSeconds = PRESET_DURATIONS_SECONDS[presetDurationIndex]
         surfaceView.milkDropRenderer.beatCutsEnabled = beatCutsEnabled
+        surfaceView.milkDropRenderer.screenDependentRendering = settings.screenDependentRendering
         surfaceView.targetFps = FPS_OPTIONS[fpsIndex]
         applyQuality()
     }
@@ -476,6 +478,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupSettingsSheet() {
         binding.btnCloseSettings.setOnClickListener { closeSettingsSheet(showControls = true) }
+        binding.switchScreenDependentRendering.setOnCheckedChangeListener { _, checked ->
+            if (updatingControls) return@setOnCheckedChangeListener
+            settings.screenDependentRendering = checked
+            surfaceView.milkDropRenderer.screenDependentRendering = checked
+        }
         binding.switchAutoAdvance.setOnCheckedChangeListener { _, checked ->
             if (updatingControls) return@setOnCheckedChangeListener
             autoAdvanceEnabled = checked

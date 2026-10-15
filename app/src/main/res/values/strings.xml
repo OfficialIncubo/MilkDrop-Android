@@ -34,6 +34,8 @@
     <string name="fps_60">60</string>
     <string name="fps_max">Max</string>
     <string name="setting_quality">Quality</string>
+    <string name="setting_screen_dependent_rendering">Screen-Dependent Render Mode</string>
+    <string name="setting_screen_dependent_rendering_description">Fit waves, shapes and preset motion to the full screen. Turn off for standard projectM rendering.</string>
     <string name="quality_low">Low</string>
     <string name="quality_medium">Medium</string>
     <string name="quality_high">High</string>

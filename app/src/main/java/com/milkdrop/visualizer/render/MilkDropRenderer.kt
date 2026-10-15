@@ -72,12 +72,17 @@ class MilkDropRenderer(
     @Volatile
     var beatCutsEnabled: Boolean = false
 
+    /** Full-screen coordinates for geometry and equations; shader aspect stays physical. */
+    @Volatile
+    var screenDependentRendering: Boolean = false
+
     private var appliedShuffle: Boolean? = null
     private var appliedAutoAdvance: Boolean? = null
     private var appliedInstantTransitions: Boolean? = null
     private var appliedMeshSize: MeshSize? = null
     private var appliedPresetDuration: Double? = null
     private var appliedBeatCuts: Boolean? = null
+    private var appliedScreenDependentRendering: Boolean? = null
 
     private val pendingNavigation = AtomicReference<Navigation?>(null)
     private val pendingTextureRefresh = AtomicBoolean(false)
@@ -153,6 +158,7 @@ class MilkDropRenderer(
         appliedMeshSize = null
         appliedPresetDuration = null
         appliedBeatCuts = null
+        appliedScreenDependentRendering = null
         // Until a preset list is handed over (see loadScannedPresets), projectM just shows its
         // built-in idle preset.
         loadedPaths = null
@@ -236,6 +242,12 @@ class MilkDropRenderer(
         if (instant != appliedInstantTransitions) {
             ProjectMBridge.nativeSetSoftCutDuration(currentHandle, if (instant) 0.0 else SOFT_CUT_DURATION_SECONDS)
             appliedInstantTransitions = instant
+        }
+
+        val screenDependent = screenDependentRendering
+        if (screenDependent != appliedScreenDependentRendering) {
+            ProjectMBridge.nativeSetScreenDependentRendering(currentHandle, screenDependent)
+            appliedScreenDependentRendering = screenDependent
         }
 
         val mesh = meshSize

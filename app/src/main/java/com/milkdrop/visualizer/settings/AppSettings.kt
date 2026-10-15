@@ -32,6 +32,10 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_FPS_INDEX, 0)
         set(value) = prefs.edit().putInt(KEY_FPS_INDEX, value).apply()
 
+    var screenDependentRendering: Boolean
+        get() = prefs.getBoolean(KEY_SCREEN_DEPENDENT_RENDERING, false)
+        set(value) = prefs.edit().putBoolean(KEY_SCREEN_DEPENDENT_RENDERING, value).apply()
+
     var qualityIndex: Int
         get() = prefs.getInt(KEY_QUALITY_INDEX, 0)
         set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX, value).apply()
@@ -57,6 +61,7 @@ class AppSettings(context: Context) {
         const val KEY_BEAT_CUTS = "beat_cuts_enabled"
         const val KEY_FPS_INDEX = "fps_index"
         const val KEY_QUALITY_INDEX = "quality_index"
+        const val KEY_SCREEN_DEPENDENT_RENDERING = "screen_dependent_rendering"
         const val KEY_AUDIO_SOURCE_INTERNAL = "audio_source_internal"
         const val KEY_AUDIO_INPUT = "audio_input"
         const val KEY_LAST_PRESET_PATH = "last_preset_path"

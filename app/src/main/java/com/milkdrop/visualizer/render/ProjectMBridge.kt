@@ -20,6 +20,7 @@ object ProjectMBridge {
     external fun nativeCreate(): Long
     external fun nativeDestroy(handle: Long)
     external fun nativeSetWindowSize(handle: Long, width: Int, height: Int)
+    external fun nativeSetScreenDependentRendering(handle: Long, enabled: Boolean)
     external fun nativeRenderFrame(handle: Long)
     external fun nativeSetTextureSearchPaths(handle: Long, paths: Array<String>)
     external fun nativeSetPresetDuration(handle: Long, seconds: Double)
