@@ -332,14 +332,9 @@
                         android:text="@string/audio_source_mic" />
 
                     <RadioButton
-                        android:id="@+id/audioSourcePhone"
+                        android:id="@+id/audioSourceInternal"
                         style="@style/Segment"
-                        android:text="@string/audio_source_phone" />
-
-                    <RadioButton
-                        android:id="@+id/audioSourceOutputMix"
-                        style="@style/Segment"
-                        android:text="@string/audio_source_output_mix" />
+                        android:text="@string/audio_source_internal" />
 
                 </RadioGroup>
 

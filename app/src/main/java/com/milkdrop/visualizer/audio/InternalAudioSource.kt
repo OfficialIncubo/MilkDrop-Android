@@ -6,13 +6,13 @@ import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Phone audio without the screen-capture prompt, via the Visualizer effect on the output mix.
+ * Internal playback audio through Android's Visualizer effect on the output mix.
  *
  * Polls the latest 8-bit snapshot on an audio-priority thread rather than waiting for rate-limited
  * callbacks on the UI looper. Normalized scaling keeps it independent of the volume setting.
  * Apps that block capture (DRM video, some streaming apps) come through as silence.
  */
-class OutputMixAudioSource(private val sink: PcmSink) : AudioSource {
+class InternalAudioSource(private val sink: PcmSink) : AudioSource {
 
     private var capture: Capture? = null
 
@@ -79,6 +79,6 @@ class OutputMixAudioSource(private val sink: PcmSink) : AudioSource {
         const val OUTPUT_MIX_SESSION = 0
         const val MONO = 1
         const val POLL_INTERVAL_MS = 5L
-        const val TAG = "OutputMixAudioSource"
+        const val TAG = "InternalAudioSource"
     }
 }

@@ -1,12 +1,10 @@
 package com.milkdrop.visualizer.ui
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.AudioManager
-import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -97,16 +95,6 @@ class MainActivity : AppCompatActivity() {
             if (binding.playlistPanel.isVisible) closePlaylistPanel() else closeSettingsSheet(showControls = true)
         }
     }
-
-    private val screenCaptureLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val data = result.data
-            if (result.resultCode == Activity.RESULT_OK && data != null) {
-                audioCaptureManager.requestInternalCapture(result.resultCode, data)
-            } else {
-                switchToMic()
-            }
-        }
 
     private val permissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -285,8 +273,15 @@ class MainActivity : AppCompatActivity() {
         if (binding.playlistPanel.isVisible) scheduleSearch()
     }
 
-    private fun hasAllFilesAccess(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+    private fun hasAllFilesAccess(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
 
     private fun setStatusMessage(@StringRes message: Int?) {
         statusMessage = if (visualizationFailed) R.string.visualization_initialization_failed else message
@@ -655,14 +650,18 @@ class MainActivity : AppCompatActivity() {
         ) {
             needed += Manifest.permission.RECORD_AUDIO
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            needed += Manifest.permission.POST_NOTIFICATIONS
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            for (permission in arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            )) {
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    needed += permission
+                }
+            }
         }
 
-        if (!hasAllFilesAccess()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasAllFilesAccess()) {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
@@ -683,26 +682,17 @@ class MainActivity : AppCompatActivity() {
     private fun startAudioInput(input: AudioInput) {
         when (input) {
             AudioInput.MIC -> switchToMic()
-            AudioInput.PHONE_AUDIO -> {
-                showAudioInput(AudioInput.PHONE_AUDIO)
-                requestInternalCapture()
-            }
-            AudioInput.OUTPUT_MIX ->
-                if (audioCaptureManager.startOutputMix()) {
-                    showAudioInput(AudioInput.OUTPUT_MIX)
+            AudioInput.INTERNAL ->
+                if (audioCaptureManager.startInternal()) {
+                    showAudioInput(AudioInput.INTERNAL)
                 } else {
                     switchToMic()
-                    binding.audioSourceDescription.setText(R.string.audio_source_output_mix_unavailable)
+                    binding.audioSourceDescription.setText(R.string.audio_source_internal_unavailable)
                 }
         }
     }
 
-    private fun requestInternalCapture() {
-        val projectionManager = getSystemService(MediaProjectionManager::class.java)
-        screenCaptureLauncher.launch(projectionManager.createScreenCaptureIntent())
-    }
-
-    /** Also the fallback when another source fails or is declined, so it moves the selection to Mic. */
+    /** Fallback when another source is unavailable; also updates the saved selection to Mic. */
     private fun switchToMic() {
         audioCaptureManager.startMic()
         showAudioInput(AudioInput.MIC)
@@ -742,13 +732,11 @@ class MainActivity : AppCompatActivity() {
 
         val AUDIO_INPUT_BUTTON_IDS = mapOf(
             AudioInput.MIC to R.id.audioSourceMic,
-            AudioInput.PHONE_AUDIO to R.id.audioSourcePhone,
-            AudioInput.OUTPUT_MIX to R.id.audioSourceOutputMix,
+            AudioInput.INTERNAL to R.id.audioSourceInternal,
         )
         val AUDIO_INPUT_DESCRIPTIONS = mapOf(
             AudioInput.MIC to R.string.audio_source_mic_description,
-            AudioInput.PHONE_AUDIO to R.string.audio_source_phone_description,
-            AudioInput.OUTPUT_MIX to R.string.audio_source_output_mix_description,
+            AudioInput.INTERNAL to R.string.audio_source_internal_description,
         )
     }
 }

@@ -45,14 +45,14 @@ produces zero immediate band values; the `bass_att`, `mid_att`, and `treb_att` v
 decay smoothly. Timing follows elapsed seconds rather than frame counts.
 
 This is applied to build-directory copies of projectM's `Loudness` implementation; the
-submodule, capture modes, permissions, and waveform/spectrum data used by presets are unchanged.
+submodule and waveform/spectrum data used by presets are unchanged.
 Frequency boundaries and response times are CMake cache options in
 `app/src/main/cpp/projectm/BeatAnalysis.cmake`; sensitivity is learned automatically rather
 than requiring a fixed input-volume threshold. For example, pass
 `-DMILKDROP_BASS_HIGH_HZ=200` as a native CMake argument to use a 200 Hz crossover.
 
-The frequency reference is 44,100 Hz, matching Mic and Phone audio capture. The existing
-capture interface does not carry sample-rate metadata, so No prompt uses that reference
+The frequency reference is 44,100 Hz, matching Mic audio capture. The existing
+capture interface does not carry sample-rate metadata, so Internal uses that reference
 too; its physical frequency boundaries may differ if Android's Visualizer uses another
 sample rate. Treble is limited to the analysis Nyquist frequency. The existing short FFT
 window also limits separation of very low bass frequencies; these bands are approximate,
@@ -129,11 +129,10 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
   default for standard projectM rendering. Applies immediately and is saved across launches.
 - **Audio source**:
   - *Mic* — the microphone; works with any player and picks up the room.
-  - *Phone audio* — what the phone plays, in full detail. Android asks for screen-capture
-    consent each time it starts (required by the `AudioPlaybackCapture` API), and some apps
-    (e.g. Spotify) block capture by design.
-  - *No prompt* — what the phone plays, without the consent dialog, through the `Visualizer`
-    API: coarser, and apps that block capture come through silent.
+  - *Internal* — what the phone plays through Android's `Visualizer` API, without a prompt.
+    Apps that block capture come through silent.
+
+The app supports Android 9 (API 28) and newer on 32-bit and 64-bit ARM and x86 devices.
 
 All settings, and the preset that was showing, are remembered across launches. The preset list
 is cached, so the app resumes within a moment of opening; it rescans the presets folder in the

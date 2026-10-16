@@ -40,11 +40,16 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_QUALITY_INDEX, 0)
         set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX, value).apply()
 
-    /** Falls back to the older on/off setting (phone audio vs mic) saved before there were three. */
+    /** Reads previous audio choices and maps both playback modes to the retained Internal source. */
     var audioInput: AudioInput
         get() = prefs.getString(KEY_AUDIO_INPUT, null)
-            ?.let { saved -> AudioInput.entries.firstOrNull { it.name == saved } }
-            ?: if (prefs.getBoolean(KEY_AUDIO_SOURCE_INTERNAL, false)) AudioInput.PHONE_AUDIO else AudioInput.MIC
+            ?.let { saved ->
+                when (saved) {
+                    "PHONE_AUDIO", "OUTPUT_MIX" -> AudioInput.INTERNAL
+                    else -> AudioInput.entries.firstOrNull { it.name == saved }
+                }
+            }
+            ?: if (prefs.getBoolean(KEY_AUDIO_SOURCE_INTERNAL, false)) AudioInput.INTERNAL else AudioInput.MIC
         set(value) = prefs.edit().putString(KEY_AUDIO_INPUT, value.name).remove(KEY_AUDIO_SOURCE_INTERNAL).apply()
 
     /** Full path of the preset showing when the app last ran, to resume on it at launch. */

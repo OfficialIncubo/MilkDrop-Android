@@ -15,8 +15,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 - Favourite and hidden presets. Favourite from the control bar or the List; the List can show
   favourites only. Hidden presets are skipped by Next, Shuffle and Auto-advance and stay in the
   List, dimmed. Both are kept in `MilkDropApp/favourites.txt` and `MilkDropApp/hidden.txt`.
-- "No prompt" audio source: phone audio without Android's screen-capture consent dialog, at
-  lower detail. Audio source is now Mic, Phone audio or No prompt.
+- Internal audio source: phone audio without Android's screen-capture consent dialog, at
+  lower detail. Audio source is now Mic or Internal.
 - MilkDrop 3 presets:
   - 16 custom shapes and waves per preset (was 4).
   - `get_fft()` / `get_fft_hz()` in preset shaders, used by MilkDrop 3's equalizers.
@@ -28,6 +28,7 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 - Audio reaches the visuals in ~10 ms steps instead of ~80 ms, so they react sooner.
 - The microphone uses the unprocessed input (no voice auto-gain or noise suppression) on phones
   that support it.
+- Minimum Android version lowered to Android 9 (API 28); 32-bit ARM devices are supported.
 - Presets get the real frame rate. It was always reported as 35, so presets that scale motion
   by it ran too fast at higher frame rates.
 
