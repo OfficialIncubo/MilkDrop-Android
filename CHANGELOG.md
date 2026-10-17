@@ -16,6 +16,14 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Accept bare `randXX` texture calls alongside `sampler_randXX` names. Bind short
+  random-texture aliases to the selected texture unit, retain each shader's sampler
+  name and filter/wrap settings when reusing a random slot, and deduplicate shared
+  uniform declarations. Respect filename prefixes such as `rand00_Stu` with sampler qualifiers.
+- Handle comma-separated texture sampler declarations, the HLSL variable name `smooth`,
+  and whole matrix-row assignments when translating preset shaders to OpenGL ES.
+  Fix shader compilation failures in martin - klingonian server bank and
+  martin - nivush - emergency power supply only, including binding the latter's skin texture.
 - Recognize shader `#ifdef` and `#ifndef` directives, including nested branches and comments.
   Fix preprocessing failures in presets such as IkeC - Equalizer that use optional visual modes.
 - Restart the switching countdown when duration or random time changes. Auto-advance off

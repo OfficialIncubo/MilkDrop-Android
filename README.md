@@ -64,6 +64,15 @@ clean FFT, RMS adaptation, smoothing and peak hold. Local date/time and touch/mo
 are also available to shaders and preset equations, including while using the overlay UI.
 Shader feature checks support `#if`, `#ifdef` and `#ifndef`, including nested branches,
 so optional BeatDrop features can select their supported or fallback code paths.
+Shader translation also supports comma-separated texture sampler declarations and
+whole matrix-row assignments, and renames HLSL identifiers that conflict with GLSL's
+`smooth` keyword. Presets using external textures still need those files in
+`MilkDropApp/textures`, including `Martin_Skin_Emergency_Power_Supply.jpg` for
+martin - nivush - emergency power supply only.
+Random textures accept both `tex2D(sampler_rand00, uv)` and `tex2D(rand00, uv)`.
+A name such as `rand00_Stu` selects a texture whose filename starts with `Stu`
+(ignoring case); place the supplied `Stu*.jpg` images in `MilkDropApp/textures`.
+Random slots keep the same selected image across the preset's warp and composite shaders.
 See [shader inputs and audio controls](Docs/SHADER_INPUTS.md) for names, coordinate
 conventions, examples and capture limitations. The BeatDrop notice is included in the APK
 at `assets/licenses/BeatDrop.txt`.

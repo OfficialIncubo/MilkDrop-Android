@@ -288,7 +288,7 @@ patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/PerPixelMesh
     "${WARP_LOG};"
 )
 
-# Samplers declared by a texture's plain name ("sampler MilkDrop3_001;") need the
+# Samplers declared by plain names, individually or in comma-separated lists, need the
 # "sampler_" prefix expected by projectM's texture loader.
 patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader.cpp
     [=[using libprojectM::MilkdropPreset::MilkdropStaticShaders;]=]
@@ -298,15 +298,25 @@ patch_projectm_source(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShad
 // the "sampler_" form projectM binds textures to.
 static void PrefixPlainSamplerNames(std::string& program)
 {
-    static const std::regex plainSamplerDeclaration(R"(\bsampler(?:2D|3D)?\s+([A-Za-z_]\w*)\s*;)");
+    static const std::regex plainSamplerDeclaration(R"(\bsampler(?:2D|3D)?\s+((?:[A-Za-z_]\w*\s*,\s*)*[A-Za-z_]\w*)\s*;)");
+    static const std::regex identifier(R"([A-Za-z_]\w*)");
+    const std::string stripped = Utils::StripComments(program);
     std::set<std::string> plainNames;
-    for (std::sregex_iterator it(program.begin(), program.end(), plainSamplerDeclaration), end; it != end; ++it)
+    for (std::sregex_iterator it(stripped.begin(), stripped.end(), plainSamplerDeclaration), end; it != end; ++it)
     {
-        std::string const name = (*it)[1];
-        if (Utils::ToLower(name).rfind("sampler_", 0) != 0)
+        const std::string names = (*it)[1];
+        for (std::sregex_iterator nameIt(names.begin(), names.end(), identifier), nameEnd; nameIt != nameEnd; ++nameIt)
         {
-            plainNames.insert(name);
+            const std::string name = nameIt->str();
+            if (Utils::ToLower(name).rfind("sampler_", 0) != 0) plainNames.insert(name);
         }
+    }
+    // MilkDrop also accepts a bare random sampler directly in texture calls,
+    // including when only its sampler_randXX alias was declared.
+    static const std::regex bareRandomSampler(R"(\btex(?:1D|2D|3D|CUBE)(?:lod|bias|grad)?\s*\(\s*((?:(?:fc|cf|fw|wf|pc|cp|pw|wp)_)?rand[0-9]{2}(?:_[A-Za-z0-9_]+)?)\b)");
+    for (std::sregex_iterator it(stripped.begin(), stripped.end(), bareRandomSampler), end; it != end; ++it)
+    {
+        plainNames.insert((*it)[1]);
     }
     for (const auto& name : plainNames)
     {
@@ -321,6 +331,8 @@ static void PrefixPlainSamplerNames(std::string& program)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ScreenDependentRendering.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderConditionals.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderAudio.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderCompatibility.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/RandomTextures.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderInputs.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/MotionVectors.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/PresetTiming.cmake)
