@@ -159,8 +159,12 @@ start with Low quality unless a quality setting has already been saved.
 
 ### TVs and projectors
 
-MilkDrop appears in the Android TV launcher. Use the remote's arrows to reveal and move
-between controls, and OK to activate the focused control. Settings, preset rows, favourite
+MilkDrop appears in the Android TV launcher. While the UI is hidden, the remote provides
+these shortcuts: OK shows controls, Left selects the previous preset, Right selects the next
+preset, Down toggles shuffle, and Up opens the preset list. A held shortcut acts once per press.
+
+With the UI visible, arrows move between controls and OK activates the focused control.
+Hold OK on the control bar to hide it. Settings, preset rows, favourite
 and hide buttons, and sliders are accessible with the D-pad. Left/right adjusts a focused
 slider. Back closes the current panel, then hides controls; another Back exits. Menu is an
 optional shortcut to Settings. Controls show a white outline when focused.

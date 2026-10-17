@@ -13,6 +13,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Remote shortcuts with the UI hidden: OK shows controls, Left/Right change preset,
+  Down toggles shuffle, and Up opens the preset list. Hold OK on the control bar to hide it;
+  normal D-pad and OK navigation remains available while the UI is visible.
 - Android TV launcher entry and banner, visible remote focus, D-pad access to preset rows
   and settings, and focus restoration when closing panels. Back hides controls before exit.
 - Auto audio source: prefer Internal playback, use the microphone during silence or when

@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -87,7 +88,7 @@ class MainActivity : AppCompatActivity() {
     private var resumeAutomaticAudio = false
     private var graphicsBlocked = false
     private var remoteNavigation = false
-    private var revealKey: Int? = null
+    private val consumedRemoteKeys = mutableSetOf<Int>()
     private var activeTouchPointer = -1
     private val pointerWindowOrigin = IntArray(2)
 
@@ -109,10 +110,7 @@ class MainActivity : AppCompatActivity() {
                 binding.playlistPanel.isVisible -> closePlaylistPanel()
                 binding.settingsSheet.isVisible -> closeSettingsSheet(showControls = true)
                 else -> {
-                    binding.controlBar.isVisible = false
-                    currentFocus?.clearFocus()
-                    isEnabled = false
-                    updateTopLabel()
+                    hideRemoteControls()
                 }
             }
         }
@@ -531,7 +529,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (graphicsBlocked) return
-        revealKey = null
+        consumedRemoteKeys.clear()
         if (settings.audioInput == AudioInput.AUTOMATIC) {
             resumeAutomaticAudio = true
             audioCaptureManager.stopAll()
@@ -838,24 +836,61 @@ class MainActivity : AppCompatActivity() {
         updateTopLabel()
     }
 
+    private fun hideRemoteControls() {
+        // A held OK may have pressed a button before it became a hide gesture.
+        currentFocus?.apply {
+            isPressed = false
+            cancelPendingInputEvents()
+            clearFocus()
+        }
+        binding.controlBar.isVisible = false
+        closePanelOnBack.isEnabled = false
+        updateTopLabel()
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (graphicsBlocked || !::binding.isInitialized) return super.dispatchKeyEvent(event)
         val key = event.keyCode
-        // Consume both halves of a key used to reveal controls, so OK does not also click Next.
-        if (revealKey == key) {
-            if (event.action == KeyEvent.ACTION_UP) revealKey = null
+        // Keep repeats and key-up away from whichever panel a shortcut just opened.
+        if (key in consumedRemoteKeys) {
+            if (event.action == KeyEvent.ACTION_UP) consumedRemoteKeys.remove(key)
             return true
         }
+        val confirmKey = key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER ||
+            key == KeyEvent.KEYCODE_NUMPAD_ENTER
         val navigationKey = key in intArrayOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
         if (navigationKey && event.action == KeyEvent.ACTION_DOWN) {
             remoteNavigation = true
-            if (!binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible &&
-                (!binding.controlBar.isVisible || currentFocus == null)) {
-                showRemoteControls()
-                revealKey = key
-                return true
+            if (!binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible) {
+                if (!binding.controlBar.isVisible) {
+                    consumedRemoteKeys.add(key)
+                    if (event.repeatCount == 0) {
+                        when (key) {
+                            KeyEvent.KEYCODE_DPAD_LEFT -> binding.btnPrevious.performClick()
+                            KeyEvent.KEYCODE_DPAD_RIGHT -> binding.btnNext.performClick()
+                            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                binding.btnShuffle.performClick()
+                                Toast.makeText(this, if (shuffleEnabled) R.string.shuffle_enabled else
+                                    R.string.shuffle_disabled, Toast.LENGTH_SHORT).show()
+                            }
+                            KeyEvent.KEYCODE_DPAD_UP -> openPlaylistPanel()
+                            else -> showRemoteControls()
+                        }
+                    }
+                    return true
+                }
+                if (confirmKey && event.isLongPress) {
+                    consumedRemoteKeys.add(key)
+                    hideRemoteControls()
+                    return true
+                }
+                if (currentFocus == null) {
+                    showRemoteControls()
+                    consumedRemoteKeys.add(key)
+                    return true
+                }
             }
         }
         // Ordinary D-pad/OK/Back navigation is sufficient; Menu is an optional shortcut.
