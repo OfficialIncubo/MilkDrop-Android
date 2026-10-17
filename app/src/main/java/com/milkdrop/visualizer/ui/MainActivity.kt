@@ -88,6 +88,7 @@ class MainActivity : AppCompatActivity() {
     private var resumeAutomaticAudio = false
     private var graphicsBlocked = false
     private var remoteNavigation = false
+    private var restoreControlsAfterPlaylist = false
     private val consumedRemoteKeys = mutableSetOf<Int>()
     private var activeTouchPointer = -1
     private val pointerWindowOrigin = IntArray(2)
@@ -792,6 +793,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openPlaylistPanel() {
+        restoreControlsAfterPlaylist = binding.controlBar.isVisible
         binding.controlBar.isVisible = false
         binding.playlistSearch.setText("")
         binding.playlistPanel.isVisible = true
@@ -822,9 +824,10 @@ class MainActivity : AppCompatActivity() {
         binding.playlistSearch.clearFocus()
         WindowCompat.getInsetsController(window, binding.playlistSearch).hide(WindowInsetsCompat.Type.ime())
         binding.playlistPanel.isVisible = false
-        binding.controlBar.isVisible = true
-        closePanelOnBack.isEnabled = true
-        if (remoteNavigation) binding.btnPlaylist.requestFocus()
+        binding.controlBar.isVisible = restoreControlsAfterPlaylist
+        closePanelOnBack.isEnabled = restoreControlsAfterPlaylist || binding.settingsSheet.isVisible
+        if (remoteNavigation && restoreControlsAfterPlaylist) binding.btnPlaylist.requestFocus()
+        updateTopLabel()
     }
 
     /**

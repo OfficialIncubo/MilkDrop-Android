@@ -6,6 +6,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Changed
 
+- Restore the sidebar after closing or selecting from the preset list only if it was visible
+  when the list opened. Swipe up and remote Up return to hidden controls.
 - Silence taps and swipe shortcuts on the visualization, while preserving normal UI sounds.
 - Make preset-list header focus move between Search, Favourites and Close with a remote;
   retain search cursor movement while the on-screen keyboard is open.

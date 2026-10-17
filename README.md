@@ -100,6 +100,9 @@ normal touch behavior. Short drags, diagonal drags and multi-touch gestures do n
 shortcuts; touch input still reaches the preset shader pointer variables.
 Taps and swipes on the visualization are silent. Buttons, Settings and the preset list keep
 their normal interaction sounds, subject to the device's sound settings.
+Closing the preset list returns to the UI state it was opened from: swipe up or remote Up
+returns to hidden controls, while the sidebar's List button returns to the sidebar. Selecting
+a preset follows the same rule.
 The preset's name shows at the top while they're up, and for a couple of seconds on each change.
 
 - **Prev / Next** — step through presets. Prev goes back through the presets you actually saw,
