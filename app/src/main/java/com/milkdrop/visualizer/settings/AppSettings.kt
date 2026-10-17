@@ -1,12 +1,14 @@
 package com.milkdrop.visualizer.settings
 
 import android.content.Context
+import android.app.ActivityManager
 import com.milkdrop.visualizer.audio.AudioInput
 
 /** Persists the overlay's toggle states (everything except momentary actions like Media) and the last preset across launches. */
 class AppSettings(context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val defaultQualityIndex = if (context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true) 2 else 0
 
     var shuffleEnabled: Boolean
         get() = prefs.getBoolean(KEY_SHUFFLE, true)
@@ -37,7 +39,7 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_SCREEN_DEPENDENT_RENDERING, value).apply()
 
     var qualityIndex: Int
-        get() = prefs.getInt(KEY_QUALITY_INDEX, 0)
+        get() = prefs.getInt(KEY_QUALITY_INDEX, defaultQualityIndex)
         set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX, value).apply()
 
     var audioSensitivity: Float

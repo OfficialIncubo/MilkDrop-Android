@@ -165,7 +165,7 @@
                 android:padding="12dp"
                 android:src="@drawable/ic_close"
                 app:tint="@color/overlay_content"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@drawable/remote_focus_background"
                 android:contentDescription="@string/settings_close" />
 
         </LinearLayout>
@@ -441,11 +441,13 @@
                 app:drawableTint="@color/toggle_content"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?android:attr/selectableItemBackground" />
+                android:background="@drawable/remote_focus_background" />
 
             <Button
                 android:id="@+id/btnClosePlaylist"
                 style="?android:attr/buttonStyleSmall"
+                android:background="@drawable/remote_focus_background"
+                android:textColor="@color/overlay_content"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/playlist_close" />

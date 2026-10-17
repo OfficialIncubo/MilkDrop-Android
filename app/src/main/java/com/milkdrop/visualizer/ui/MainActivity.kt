@@ -21,6 +21,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.SeekBar
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -46,6 +47,7 @@ import com.milkdrop.visualizer.presets.PresetRatingsStore
 import com.milkdrop.visualizer.render.MilkDropRenderer.MeshSize
 import com.milkdrop.visualizer.render.MilkDropRenderer.Navigation
 import com.milkdrop.visualizer.render.MilkDropSurfaceView
+import com.milkdrop.visualizer.render.GraphicsSupport
 import com.milkdrop.visualizer.settings.AppSettings
 import com.milkdrop.visualizer.settings.AudioTuning
 import java.io.File
@@ -83,6 +85,9 @@ class MainActivity : AppCompatActivity() {
     private var fpsIndex = 0
     private var qualityIndex = 0
     private var resumeAutomaticAudio = false
+    private var graphicsBlocked = false
+    private var remoteNavigation = false
+    private var revealKey: Int? = null
     private var activeTouchPointer = -1
     private val pointerWindowOrigin = IntArray(2)
 
@@ -100,7 +105,16 @@ class MainActivity : AppCompatActivity() {
     /** Back closes the open panel (preset list or settings) instead of exiting the app. */
     private val closePanelOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            if (binding.playlistPanel.isVisible) closePlaylistPanel() else closeSettingsSheet(showControls = true)
+            when {
+                binding.playlistPanel.isVisible -> closePlaylistPanel()
+                binding.settingsSheet.isVisible -> closeSettingsSheet(showControls = true)
+                else -> {
+                    binding.controlBar.isVisible = false
+                    currentFocus?.clearFocus()
+                    isEnabled = false
+                    updateTopLabel()
+                }
+            }
         }
     }
 
@@ -112,6 +126,19 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setImmersiveFullscreen()
+
+        val graphics = GraphicsSupport.check(this)
+        if (!graphics.supported) {
+            graphicsBlocked = true
+            setContentView(R.layout.activity_unsupported_graphics)
+            findViewById<TextView>(R.id.graphicsUnsupportedMessage).text =
+                getString(R.string.graphics_unsupported_message, graphics.version)
+            findViewById<View>(R.id.btnExitUnsupported).apply {
+                setOnClickListener { finish() }
+                requestFocus()
+            }
+            return
+        }
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -168,6 +195,10 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, closePanelOnBack)
         applyOrientation(resources.configuration.orientation)
         applySystemBarInsets()
+        if (isTelevision()) {
+            remoteNavigation = true
+            showRemoteControls()
+        }
         requestPermissionsThenStartAudio()
         loadPresetsInBackground()
     }
@@ -385,6 +416,7 @@ class MainActivity : AppCompatActivity() {
     /** Rotation doesn't recreate the activity (see the manifest), so the control layout switches here. */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        if (graphicsBlocked) return
         applyOrientation(newConfig.orientation)
     }
 
@@ -419,6 +451,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (graphicsBlocked) return
         surfaceView.onResume()
         if (resumeAutomaticAudio) {
             resumeAutomaticAudio = false
@@ -497,6 +530,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (graphicsBlocked) return
+        revealKey = null
         if (settings.audioInput == AudioInput.AUTOMATIC) {
             resumeAutomaticAudio = true
             audioCaptureManager.stopAll()
@@ -508,7 +543,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        audioCaptureManager.stopAll()
+        if (::audioCaptureManager.isInitialized) {
+            audioCaptureManager.onAutomaticSourceChanged = null
+            audioCaptureManager.stopAll()
+        }
+        if (::binding.isInitialized) binding.playlistSearch.removeCallbacks(pendingSearch)
         searchExecutor.shutdownNow()
         ratingsWriter.shutdown() // lets a pending save finish
     }
@@ -526,6 +565,7 @@ class MainActivity : AppCompatActivity() {
      * With the settings sheet open, a tap on the visuals closes it.
      */
     private fun setupGestures() {
+        surfaceView.isFocusable = false // Remote focus belongs to the overlay controls.
         surfaceView.setOnClickListener {
             if (binding.settingsSheet.isVisible) closeSettingsSheet(showControls = false) else toggleControlBar()
         }
@@ -574,6 +614,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettingsSheet() {
+        listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchScreenDependentRendering,
+            binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {
+            it.setBackgroundResource(R.drawable.remote_focus_background)
+        }
         binding.btnCloseSettings.setOnClickListener { closeSettingsSheet(showControls = true) }
         binding.switchScreenDependentRendering.setOnCheckedChangeListener { _, checked ->
             if (updatingControls) return@setOnCheckedChangeListener
@@ -662,13 +706,15 @@ class MainActivity : AppCompatActivity() {
         binding.settingsSheet.isVisible = true
         binding.settingsScroll.scrollTo(0, 0)
         closePanelOnBack.isEnabled = true
+        if (remoteNavigation) binding.switchAutoAdvance.requestFocus()
         updateTopLabel()
     }
 
     private fun closeSettingsSheet(showControls: Boolean) {
         binding.settingsSheet.isVisible = false
         binding.controlBar.isVisible = showControls
-        closePanelOnBack.isEnabled = binding.playlistPanel.isVisible
+        closePanelOnBack.isEnabled = showControls || binding.playlistPanel.isVisible
+        if (remoteNavigation && showControls) binding.btnSettings.requestFocus()
         updateTopLabel()
     }
 
@@ -723,6 +769,14 @@ class MainActivity : AppCompatActivity() {
         presetAdapter.submit(entries, currentPresetPath)
         val current = entries.indexOfFirst { it.path == currentPresetPath }
         if (current >= 0) binding.playlistRecyclerView.scrollToPosition(current)
+        if (remoteNavigation) {
+            binding.btnClosePlaylist.requestFocus()
+            binding.playlistRecyclerView.post {
+                if (binding.playlistPanel.isVisible) {
+                    binding.playlistRecyclerView.layoutManager?.findViewByPosition(current.coerceAtLeast(0))?.requestFocus()
+                }
+            }
+        }
     }
 
     /** The List before the search query: all presets, or only favourites. */
@@ -735,7 +789,9 @@ class MainActivity : AppCompatActivity() {
         binding.playlistSearch.clearFocus()
         WindowCompat.getInsetsController(window, binding.playlistSearch).hide(WindowInsetsCompat.Type.ime())
         binding.playlistPanel.isVisible = false
-        closePanelOnBack.isEnabled = binding.settingsSheet.isVisible
+        binding.controlBar.isVisible = true
+        closePanelOnBack.isEnabled = true
+        if (remoteNavigation) binding.btnPlaylist.requestFocus()
     }
 
     /**
@@ -766,7 +822,52 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleControlBar() {
         binding.controlBar.isVisible = !binding.controlBar.isVisible
+        closePanelOnBack.isEnabled = binding.controlBar.isVisible
+        if (remoteNavigation && binding.controlBar.isVisible) binding.btnNext.requestFocus()
         updateTopLabel()
+    }
+
+    private fun isTelevision(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+    private fun showRemoteControls() {
+        binding.controlBar.isVisible = true
+        closePanelOnBack.isEnabled = true
+        binding.btnNext.requestFocus()
+        updateTopLabel()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (graphicsBlocked || !::binding.isInitialized) return super.dispatchKeyEvent(event)
+        val key = event.keyCode
+        // Consume both halves of a key used to reveal controls, so OK does not also click Next.
+        if (revealKey == key) {
+            if (event.action == KeyEvent.ACTION_UP) revealKey = null
+            return true
+        }
+        val navigationKey = key in intArrayOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
+        if (navigationKey && event.action == KeyEvent.ACTION_DOWN) {
+            remoteNavigation = true
+            if (!binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible &&
+                (!binding.controlBar.isVisible || currentFocus == null)) {
+                showRemoteControls()
+                revealKey = key
+                return true
+            }
+        }
+        // Ordinary D-pad/OK/Back navigation is sufficient; Menu is an optional shortcut.
+        if (key == KeyEvent.KEYCODE_MENU) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                remoteNavigation = true
+                if (binding.playlistPanel.isVisible) closePlaylistPanel()
+                if (binding.settingsSheet.isVisible) closeSettingsSheet(true) else openSettingsSheet()
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     /** Sends a media key to whichever app is playing, as headset buttons would. */

@@ -153,7 +153,24 @@ used for visualization, while FFT scaling and noise floor adjust shader FFT outp
 Auto requires microphone permission. It pauses capture while the app is in the background
 and resumes automatically when you return. Your selected audio mode is saved across launches.
 
-The app supports Android 9 (API 28) and newer on 32-bit and 64-bit ARM and x86 devices.
+The app requires Android 9 (API 28) or newer and a GPU with working OpenGL ES 3.0 support.
+The unified APK includes 32-bit and 64-bit ARM and x86 builds. Devices that report low RAM
+start with Low quality unless a quality setting has already been saved.
+
+### TVs and projectors
+
+MilkDrop appears in the Android TV launcher. Use the remote's arrows to reveal and move
+between controls, and OK to activate the focused control. Settings, preset rows, favourite
+and hide buttons, and sliders are accessible with the D-pad. Left/right adjusts a focused
+slider. Back closes the current panel, then hides controls; another Back exits. Menu is an
+optional shortcut to Settings. Controls show a white outline when focused.
+
+Android version alone does not determine graphics support. For example, an Android 9
+projector with a Mali-450 GPU reporting OpenGL ES 2.0 cannot run the current projectM renderer.
+Startup now checks the advertised graphics version and probes an ES 3 context before
+starting projectM or requesting permissions. Unsupported devices show an explanation and
+a remote-accessible Close app button. This does not add an OpenGL ES 2 renderer. A compatible
+Android TV device connected over HDMI can provide the rendering for an older projector.
 
 All settings, and the preset that was showing, are remembered across launches. The preset list
 is cached, so the app resumes within a moment of opening; it rescans the presets folder in the

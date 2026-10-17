@@ -6,11 +6,15 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Check graphics support before creating the renderer. OpenGL ES 2-only projectors show a
+  compatibility message instead of attempting to create an unsupported ES 3 surface.
 - Preset shader feature checks such as `#if HAS_FFT_PEAK` and
   `#if defined(HAS_FFT_PEAK)` now evaluate correctly, including nested inactive branches.
 
 ### Added
 
+- Android TV launcher entry and banner, visible remote focus, D-pad access to preset rows
+  and settings, and focus restoration when closing panels. Back hides controls before exit.
 - Auto audio source: prefer Internal playback, use the microphone during silence or when
   Internal capture is unavailable, and switch back when sound resumes. Includes a live
   source description, capture retries, and pause/resume handling when leaving the app.
@@ -23,6 +27,7 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Changed
 
+- Default to Low render quality on devices reporting low RAM, preserving saved choices.
 - Shader Hz lookups follow the capture sample rate; overlapping Internal audio snapshots
   are analyzed without concatenating them into a false continuous waveform.
 - Launcher icon now uses the supplied MilkDrop spiral artwork.

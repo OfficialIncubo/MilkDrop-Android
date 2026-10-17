@@ -66,6 +66,9 @@ class MilkDropSurfaceView(
 
     init {
         setEGLContextClientVersion(3)
+        // projectM draws 2D into its own targets. Do not require the default chooser's
+        // 16-bit depth buffer; use the same RGB requirements as the startup graphics probe.
+        setEGLConfigChooser(8, 8, 8, 0, 0, 0)
         // Keeps projectM's GL objects (and the loaded playlist) alive across pause/resume, e.g.
         // behind the permission and screen-capture dialogs, instead of rebuilding it every time.
         preserveEGLContextOnPause = true
