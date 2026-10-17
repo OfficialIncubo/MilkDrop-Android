@@ -18,9 +18,22 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_ADVANCE, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_ADVANCE, value).apply()
 
-    var presetDurationIndex: Int
-        get() = prefs.getInt(KEY_PRESET_DURATION_INDEX, 1)
-        set(value) = prefs.edit().putInt(KEY_PRESET_DURATION_INDEX, value).apply()
+    var presetDurationSeconds: Int
+        get() {
+            val legacy = PresetTiming.legacyDurations.getOrElse(prefs.getInt(KEY_PRESET_DURATION_INDEX, 1)) { 15 }
+            return prefs.getInt(KEY_PRESET_DURATION, legacy).takeIf { it in PresetTiming.durations } ?: 15
+        }
+        set(value) = prefs.edit().putInt(KEY_PRESET_DURATION, value.takeIf { it in PresetTiming.durations } ?: 15)
+            .remove(KEY_PRESET_DURATION_INDEX).apply()
+
+    var additionalRandomSeconds: Int
+        get() = prefs.getInt(KEY_RANDOM_TIME, 0).takeIf { it in PresetTiming.additionalRandom } ?: 0
+        set(value) = prefs.edit().putInt(KEY_RANDOM_TIME, value.takeIf { it in PresetTiming.additionalRandom } ?: 0).apply()
+
+    var transitionSeconds: Float
+        get() = prefs.getFloat(KEY_TRANSITION_TIME, 1.7f).takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f
+        set(value) = prefs.edit().putFloat(KEY_TRANSITION_TIME,
+            value.takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f).apply()
 
     var beatCutsEnabled: Boolean
         get() = prefs.getBoolean(KEY_BEAT_CUTS, false)
@@ -83,6 +96,9 @@ class AppSettings(context: Context) {
         const val KEY_AUTO_ADVANCE = "auto_advance_enabled"
         const val KEY_HARD_CUT = "hard_cut_enabled"
         const val KEY_PRESET_DURATION_INDEX = "preset_duration_index"
+        const val KEY_PRESET_DURATION = "preset_duration_seconds"
+        const val KEY_RANDOM_TIME = "additional_random_seconds"
+        const val KEY_TRANSITION_TIME = "transition_seconds"
         const val KEY_BEAT_CUTS = "beat_cuts_enabled"
         const val KEY_FPS_INDEX = "fps_index"
         const val KEY_QUALITY_INDEX = "quality_index"

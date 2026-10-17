@@ -1,4 +1,11 @@
 <resources>
+    <style name="TimingSpinner">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:spinnerMode">dropdown</item>
+        <item name="android:focusable">true</item>
+        <item name="android:popupBackground">@color/overlay_sheet</item>
+    </style>
     <!-- Preset controls: icon over a short label. -->
     <style name="ControlButton">
         <item name="android:layout_width">0dp</item>

@@ -23,6 +23,9 @@ import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -51,6 +54,7 @@ import com.milkdrop.visualizer.render.MilkDropSurfaceView
 import com.milkdrop.visualizer.render.GraphicsSupport
 import com.milkdrop.visualizer.settings.AppSettings
 import com.milkdrop.visualizer.settings.AudioTuning
+import com.milkdrop.visualizer.settings.PresetTiming
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -68,6 +72,8 @@ class MainActivity : AppCompatActivity() {
     private var shuffleEnabled = true
     private var hardCutEnabled = false
     private var presetDurationIndex = 1
+    private var additionalRandomIndex = 0
+    private var transitionTimeIndex = 3
     private var beatCutsEnabled = false
     private lateinit var ratings: PresetRatings
     private lateinit var ratingsStore: PresetRatingsStore
@@ -155,7 +161,9 @@ class MainActivity : AppCompatActivity() {
         autoAdvanceEnabled = settings.autoAdvanceEnabled
         shuffleEnabled = settings.shuffleEnabled
         hardCutEnabled = settings.hardCutEnabled
-        presetDurationIndex = settings.presetDurationIndex
+        presetDurationIndex = PresetTiming.durations.indexOf(settings.presetDurationSeconds)
+        additionalRandomIndex = PresetTiming.additionalRandom.indexOf(settings.additionalRandomSeconds)
+        transitionTimeIndex = PresetTiming.transitions.indexOfFirst { it == settings.transitionSeconds }
         beatCutsEnabled = settings.beatCutsEnabled
         fpsIndex = settings.fpsIndex
         qualityIndex = settings.qualityIndex
@@ -209,7 +217,9 @@ class MainActivity : AppCompatActivity() {
         binding.switchAutoAdvance.isChecked = autoAdvanceEnabled
         binding.switchBeatCuts.isChecked = beatCutsEnabled
         binding.switchScreenDependentRendering.isChecked = settings.screenDependentRendering
-        binding.groupPresetDuration.check(PRESET_DURATION_BUTTON_IDS[presetDurationIndex])
+        configureTimingSpinner(binding.spinnerPresetDuration, R.array.preset_duration_options, presetDurationIndex)
+        configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
+        configureTimingSpinner(binding.spinnerTransitionTime, R.array.transition_time_options, transitionTimeIndex)
         binding.groupTransition.check(if (hardCutEnabled) R.id.transitionInstant else R.id.transitionSmooth)
         binding.groupFrameRate.check(FPS_BUTTON_IDS[fpsIndex])
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
@@ -233,7 +243,9 @@ class MainActivity : AppCompatActivity() {
         surfaceView.milkDropRenderer.shuffleEnabled = shuffleEnabled
         surfaceView.milkDropRenderer.autoAdvanceEnabled = autoAdvanceEnabled
         surfaceView.milkDropRenderer.instantTransitions = hardCutEnabled
-        surfaceView.milkDropRenderer.presetDurationSeconds = PRESET_DURATIONS_SECONDS[presetDurationIndex]
+        surfaceView.milkDropRenderer.presetDurationSeconds = settings.presetDurationSeconds.toDouble()
+        surfaceView.milkDropRenderer.additionalRandomSeconds = settings.additionalRandomSeconds.toDouble()
+        surfaceView.milkDropRenderer.transitionSeconds = settings.transitionSeconds.toDouble()
         surfaceView.milkDropRenderer.beatCutsEnabled = beatCutsEnabled
         surfaceView.milkDropRenderer.screenDependentRendering = settings.screenDependentRendering
         surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
@@ -542,6 +554,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        searchGeneration++
         if (::audioCaptureManager.isInitialized) {
             audioCaptureManager.onAutomaticSourceChanged = null
             audioCaptureManager.stopAll()
@@ -571,7 +584,7 @@ class MainActivity : AppCompatActivity() {
         }
         surfaceView.setOnTouchListener(VisualizationTouchListener(this,
             canSwipe = {
-                !binding.controlBar.isVisible && !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible
+                !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible
             },
             onSwipe = { swipe ->
                 when (swipe) {
@@ -579,7 +592,7 @@ class MainActivity : AppCompatActivity() {
                     VisualizationTouchListener.Swipe.RIGHT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Previous)
                     VisualizationTouchListener.Swipe.UP -> {
                         remoteNavigation = false
-                        openPlaylistPanel()
+                        openPlaylistPanel(restoreControls = false)
                     }
                     VisualizationTouchListener.Swipe.DOWN -> toggleShuffleWithFeedback()
                 }
@@ -660,10 +673,26 @@ class MainActivity : AppCompatActivity() {
             settings.beatCutsEnabled = checked
             surfaceView.milkDropRenderer.beatCutsEnabled = checked
         }
-        binding.groupPresetDuration.onUserSelection { id ->
-            presetDurationIndex = PRESET_DURATION_BUTTON_IDS.indexOf(id)
-            settings.presetDurationIndex = presetDurationIndex
-            surfaceView.milkDropRenderer.presetDurationSeconds = PRESET_DURATIONS_SECONDS[presetDurationIndex]
+        binding.spinnerPresetDuration.onUserSelection { index ->
+            if (index != presetDurationIndex) {
+                presetDurationIndex = index
+                settings.presetDurationSeconds = PresetTiming.durations[index]
+                surfaceView.milkDropRenderer.presetDurationSeconds = settings.presetDurationSeconds.toDouble()
+            }
+        }
+        binding.spinnerAdditionalRandom.onUserSelection { index ->
+            if (index != additionalRandomIndex) {
+                additionalRandomIndex = index
+                settings.additionalRandomSeconds = PresetTiming.additionalRandom[index]
+                surfaceView.milkDropRenderer.additionalRandomSeconds = settings.additionalRandomSeconds.toDouble()
+            }
+        }
+        binding.spinnerTransitionTime.onUserSelection { index ->
+            if (index != transitionTimeIndex) {
+                transitionTimeIndex = index
+                settings.transitionSeconds = PresetTiming.transitions[index]
+                surfaceView.milkDropRenderer.transitionSeconds = settings.transitionSeconds.toDouble()
+            }
         }
         binding.groupTransition.onUserSelection { id ->
             hardCutEnabled = id == R.id.transitionInstant
@@ -716,6 +745,22 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
             override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
         })
+    }
+
+    private fun configureTimingSpinner(spinner: Spinner, labels: Int, index: Int) {
+        spinner.adapter = ArrayAdapter.createFromResource(this, labels, android.R.layout.simple_spinner_item).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spinner.setSelection(index)
+    }
+
+    private fun Spinner.onUserSelection(action: (Int) -> Unit) {
+        onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (!updatingControls && position >= 0) action(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
     }
 
     /** Runs [action] when the user picks a different option, not when code changes the selection. */
@@ -792,8 +837,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun openPlaylistPanel() {
-        restoreControlsAfterPlaylist = binding.controlBar.isVisible
+    private fun openPlaylistPanel(restoreControls: Boolean = binding.controlBar.isVisible) {
+        restoreControlsAfterPlaylist = restoreControls
         binding.controlBar.isVisible = false
         binding.playlistSearch.setText("")
         binding.playlistPanel.isVisible = true
@@ -801,7 +846,7 @@ class MainActivity : AppCompatActivity() {
         updateTopLabel()
 
         val entries = visibleEntries()
-        presetAdapter.submit(entries, currentPresetPath)
+        showSearchResults(entries, "")
         val current = entries.indexOfFirst { it.path == currentPresetPath }
         if (current >= 0) binding.playlistRecyclerView.scrollToPosition(current)
         if (remoteNavigation) {
@@ -819,6 +864,8 @@ class MainActivity : AppCompatActivity() {
         if (favouritesOnly) presetEntries.filter { ratings.isFavourite(it.path) } else presetEntries
 
     private fun closePlaylistPanel() {
+        searchGeneration++
+        binding.playlistSearch.removeCallbacks(pendingSearch)
         // The search box's keyboard otherwise stays up after picking a preset, covering (and
         // swallowing taps meant for) the controls.
         binding.playlistSearch.clearFocus()
@@ -836,24 +883,34 @@ class MainActivity : AppCompatActivity() {
      */
     private fun scheduleSearch() {
         binding.playlistSearch.removeCallbacks(pendingSearch)
+        val generation = ++searchGeneration
         pendingSearch = Runnable {
-            val generation = ++searchGeneration
             val query = binding.playlistSearch.text?.toString().orEmpty()
             val entries = visibleEntries()
             searchExecutor.execute {
-                val filtered = if (query.isBlank()) {
-                    entries
-                } else {
-                    entries.filter { it.path.contains(query, ignoreCase = true) }
-                }
+                val filtered = PresetSearch.filter(entries, query)
                 runOnUiThread {
-                    if (generation == searchGeneration) {
-                        presetAdapter.submit(filtered, currentPresetPath)
+                    if (!isDestroyed && binding.playlistPanel.isVisible && generation == searchGeneration) {
+                        showSearchResults(filtered, query)
                     }
                 }
             }
         }
         binding.playlistSearch.postDelayed(pendingSearch, SEARCH_DEBOUNCE_MS)
+    }
+
+    private fun showSearchResults(entries: List<PresetEntry>, query: String) {
+        presetAdapter.submit(entries, currentPresetPath)
+        binding.playlistResultsStatus.apply {
+            text = when {
+                entries.isNotEmpty() -> resources.getQuantityString(R.plurals.playlist_result_count, entries.size, entries.size)
+                query.isNotBlank() && favouritesOnly -> getString(R.string.playlist_no_favourite_results)
+                query.isNotBlank() -> getString(R.string.playlist_no_results)
+                favouritesOnly -> getString(R.string.playlist_no_favourites)
+                else -> getString(R.string.playlist_empty)
+            }
+            isVisible = true
+        }
     }
 
     private fun toggleControlBar() {
@@ -1033,9 +1090,6 @@ class MainActivity : AppCompatActivity() {
         const val DIVIDER_GAP_DP = 4
         const val LANDSCAPE_DIVIDER_HEIGHT_DP = 32
         const val LANDSCAPE_SHEET_WIDTH_DP = 480
-
-        val PRESET_DURATIONS_SECONDS = doubleArrayOf(10.0, 15.0, 30.0, 60.0)
-        val PRESET_DURATION_BUTTON_IDS = intArrayOf(R.id.duration10, R.id.duration15, R.id.duration30, R.id.duration60)
 
         // 0 = uncapped ("Max"). Index 0 (30fps) is the default performance-friendly setting.
         val FPS_OPTIONS = intArrayOf(30, 45, 60, 0)

@@ -4,10 +4,26 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Added
+
+- Match search words in any order, ignoring case and extra whitespace, and show result
+  counts and clear messages for empty search results, empty libraries or no favourites.
+- Time per preset choices of 10, 15, 20, 25, 30, 45 and 60 seconds; Additional random time
+  options of Off or up to 5, 10, 15, 20, 25 and 30 seconds; and Transition time choices of
+  0.5, 1, 1.5, 1.7 (default), 2 and 5 seconds. Preserve existing saved preset durations.
+
+### Fixed
+
+- Restart the switching countdown when duration or random time changes. Auto-advance off
+  resets and holds the countdown at zero; enabling it starts again. Preserve preset animation
+  and blends in progress, and discard stale search results after editing or closing the list.
+
 ### Changed
 
-- Restore the sidebar after closing or selecting from the preset list only if it was visible
-  when the list opened. Swipe up and remote Up return to hidden controls.
+- Allow visualization swipes with the control bar shown or hidden, preserving overlay interactions.
+- Use the sidebar's translucent background for Settings and the preset list.
+- Restore the sidebar after closing or selecting from the preset list when opened with its
+  List button. Swipe up and remote Up return to hidden controls.
 - Silence taps and swipe shortcuts on the visualization, while preserving normal UI sounds.
 - Make preset-list header focus move between Search, Favourites and Close with a remote;
   retain search cursor movement while the on-screen keyboard is open.

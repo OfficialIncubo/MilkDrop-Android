@@ -195,6 +195,13 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetHardCutEnabled(
 }
 
 JNIEXPORT void JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetAdditionalRandomTime(
+        JNIEnv*, jobject, jlong handlePtr, jdouble seconds) {
+    // The Android TimeKeeper patch interprets this as a uniform, nonnegative addition.
+    projectm_set_easter_egg(AsHandle(handlePtr)->projectM, static_cast<float>(seconds));
+}
+
+JNIEXPORT void JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetHardCutDuration(
         JNIEnv*, jobject, jlong handlePtr, jdouble seconds) {
     projectm_set_hard_cut_duration(AsHandle(handlePtr)->projectM, seconds);

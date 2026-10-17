@@ -323,6 +323,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderConditionals.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderAudio.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderInputs.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/MotionVectors.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/PresetTiming.cmake)
 
 find_library(log-lib log)
 target_link_libraries(projectM PRIVATE ${log-lib})

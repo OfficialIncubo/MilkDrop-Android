@@ -93,14 +93,14 @@ reinstalling the app, can be copied to another phone with the presets, and can b
 ## Controls
 
 Tap the visuals to show the controls; tap again to hide them. They stay up until you tap again.
-With the UI hidden, swipe on the visuals to use shortcuts: right selects the previous preset,
+Swipe on the visuals to use shortcuts: right selects the previous preset,
 left selects the next, up opens the preset list, and down toggles shuffle with brief status feedback. Swipes
-are disabled while the control bar, Settings or preset list is visible. Sliders and the preset list keep their
+work with the control bar shown or hidden, and are disabled over Settings and the preset list. Sliders and the preset list keep their
 normal touch behavior. Short drags, diagonal drags and multi-touch gestures do not trigger
 shortcuts; touch input still reaches the preset shader pointer variables.
 Taps and swipes on the visualization are silent. Buttons, Settings and the preset list keep
 their normal interaction sounds, subject to the device's sound settings.
-Closing the preset list returns to the UI state it was opened from: swipe up or remote Up
+Closing the preset list depends on how it was opened: swipe up or remote Up
 returns to hidden controls, while the sidebar's List button returns to the sidebar. Selecting
 a preset follows the same rule.
 The preset's name shows at the top while they're up, and for a couple of seconds on each change.
@@ -112,6 +112,9 @@ The preset's name shows at the top while they're up, and for a couple of seconds
 - **List** — browse and search all presets; tap one to jump to it. Each row has a favourite and a
   hide button, and **Favourites** shows only favourites. Hidden presets stay in the list, dimmed,
   but Next, Shuffle and Auto-advance skip them. Back closes the list.
+  Search ignores case and extra whitespace and matches all words in any order, including
+  folder names. For example, `remix zylot` finds `Zylot - To Deep 13 (Wanders Remix)`.
+  The list shows a result count or an explanation when no presets match the query or filter.
 - **Settings** — see below.
 - **⏮ ⏯ ⏭** — previous track, play/pause and next track in whatever audio app is playing.
 
@@ -135,10 +138,16 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
 
 ### Settings
 
-- **Auto-advance** — switch preset on a timer; when off, stays on the current preset.
+- **Auto-advance** — switch preset on a timer. Turning it off resets and holds the switching
+  countdown at zero; turning it on starts a fresh countdown. Preset animation keeps running.
 - **Change on big beats** — also switch on a sudden jump in loudness.
-- **Time per preset** — 10, 15, 30 or 60 seconds.
-- **Transition** — Smooth blends into the next preset over a second; Instant cuts straight to it.
+- **Time per preset** — 10, 15, 20, 25, 30, 45 or 60 seconds. Changing it restarts the countdown.
+- **Additional random time** — Off, 5, 10, 15, 20, 25 or 30 seconds. Adds a fresh random amount
+  from zero up to the selected limit per preset. For example, 15 s plus up to 5 s means 15–20 s.
+  Off is the default. Changing the limit also restarts the countdown.
+- **Transition time** — 0.5, 1, 1.5, 1.7 (default), 2 or 5 seconds for smooth transitions.
+  Changes apply to the next blend, preserving any blend already in progress.
+- **Transition** — Smooth blends using Transition time; Instant cuts straight to the next preset.
 - **Frame rate** — 30, 45, 60 or Max. MilkDrop's motion advances per frame, so presets move
   faster at higher frame rates.
 - **Quality** — render resolution (High / Medium / Low). Low also uses a coarser warp mesh.
@@ -162,6 +171,8 @@ The audio sliders apply immediately and are saved. Audio sensitivity affects the
 used for visualization, while FFT scaling and noise floor adjust shader FFT output.
 Auto requires microphone permission. It pauses capture while the app is in the background
 and resumes automatically when you return. Your selected audio mode is saved across launches.
+
+Settings and the preset list use the same translucent background as the sidebar.
 
 The app requires Android 9 (API 28) or newer and a GPU with working OpenGL ES 3.0 support.
 The unified APK includes 32-bit and 64-bit ARM and x86 builds. Devices that report low RAM

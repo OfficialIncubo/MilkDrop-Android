@@ -26,6 +26,7 @@ object ProjectMBridge {
     external fun nativeRenderFrame(handle: Long)
     external fun nativeSetTextureSearchPaths(handle: Long, paths: Array<String>)
     external fun nativeSetPresetDuration(handle: Long, seconds: Double)
+    external fun nativeSetAdditionalRandomTime(handle: Long, seconds: Double)
     external fun nativeSetHardCutEnabled(handle: Long, enabled: Boolean)
     external fun nativeSetHardCutDuration(handle: Long, seconds: Double)
     external fun nativeSetFps(handle: Long, fps: Int)

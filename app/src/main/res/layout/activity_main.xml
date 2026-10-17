@@ -213,34 +213,33 @@
 
                 <TextView
                     style="@style/SettingLabel"
-                    android:labelFor="@id/groupPresetDuration"
+                    android:labelFor="@id/spinnerPresetDuration"
                     android:text="@string/setting_preset_duration" />
 
-                <RadioGroup
-                    android:id="@+id/groupPresetDuration"
-                    style="@style/SegmentedGroup">
+                <Spinner
+                    android:id="@+id/spinnerPresetDuration"
+                    style="@style/TimingSpinner"
+                    android:contentDescription="@string/setting_preset_duration" />
 
-                    <RadioButton
-                        android:id="@+id/duration10"
-                        style="@style/Segment"
-                        android:text="@string/duration_10" />
+                <TextView
+                    style="@style/SettingLabel"
+                    android:labelFor="@id/spinnerAdditionalRandom"
+                    android:text="@string/setting_additional_random" />
 
-                    <RadioButton
-                        android:id="@+id/duration15"
-                        style="@style/Segment"
-                        android:text="@string/duration_15" />
+                <Spinner
+                    android:id="@+id/spinnerAdditionalRandom"
+                    style="@style/TimingSpinner"
+                    android:contentDescription="@string/setting_additional_random" />
 
-                    <RadioButton
-                        android:id="@+id/duration30"
-                        style="@style/Segment"
-                        android:text="@string/duration_30" />
+                <TextView
+                    style="@style/SettingLabel"
+                    android:labelFor="@id/spinnerTransitionTime"
+                    android:text="@string/setting_transition_time" />
 
-                    <RadioButton
-                        android:id="@+id/duration60"
-                        style="@style/Segment"
-                        android:text="@string/duration_60" />
-
-                </RadioGroup>
+                <Spinner
+                    android:id="@+id/spinnerTransitionTime"
+                    style="@style/TimingSpinner"
+                    android:contentDescription="@string/setting_transition_time" />
 
                 <TextView
                     style="@style/SettingLabel"
@@ -408,7 +407,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#EE000000"
+        android:background="@color/overlay_sheet"
         android:visibility="gone">
 
         <LinearLayout
@@ -464,6 +463,16 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/playlistResultsStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:textColor="@color/overlay_content"
+            android:textSize="16sp"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/playlistRecyclerView"
             android:layout_width="match_parent"

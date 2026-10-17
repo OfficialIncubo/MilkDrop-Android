@@ -40,6 +40,8 @@ class MilkDropRenderer(
         }
     }
 
+    private val pendingCountdownRestart = AtomicBoolean(false)
+
     @Volatile
     var handle: Long = 0L
         private set
@@ -47,9 +49,15 @@ class MilkDropRenderer(
     @Volatile
     var shuffleEnabled: Boolean = true
 
-    /** When false, projectM's own preset-duration timer is locked so it stops switching presets. */
+    /** Disabled holds the switching countdown at zero; changing it restarts the countdown. */
     @Volatile
     var autoAdvanceEnabled: Boolean = true
+        set(value) {
+            if (field != value) {
+                field = value
+                pendingCountdownRestart.set(true)
+            }
+        }
 
     /**
      * Hard cuts instead of blended transitions, for both manual navigation and projectM's own
@@ -68,6 +76,24 @@ class MilkDropRenderer(
     /** How long auto-advance shows each preset. */
     @Volatile
     var presetDurationSeconds: Double = 15.0
+        set(value) {
+            if (field != value) {
+                field = value
+                pendingCountdownRestart.set(true)
+            }
+        }
+
+    @Volatile
+    var additionalRandomSeconds: Double = 0.0
+        set(value) {
+            if (field != value) {
+                field = value
+                pendingCountdownRestart.set(true)
+            }
+        }
+
+    @Volatile
+    var transitionSeconds: Double = 1.7
 
     /** Also switch preset (hard cut) on a sudden jump in loudness, once a preset has shown a while. */
     @Volatile
@@ -109,6 +135,8 @@ class MilkDropRenderer(
     private var appliedInstantTransitions: Boolean? = null
     private var appliedMeshSize: MeshSize? = null
     private var appliedPresetDuration: Double? = null
+    private var appliedRandomDuration: Double? = null
+    private var appliedTransitionSeconds: Double? = null
     private var appliedBeatCuts: Boolean? = null
     private var appliedScreenDependentRendering: Boolean? = null
     private var appliedFftScaling: Float? = null
@@ -187,6 +215,8 @@ class MilkDropRenderer(
         appliedInstantTransitions = null
         appliedMeshSize = null
         appliedPresetDuration = null
+        appliedRandomDuration = null
+        appliedTransitionSeconds = null
         appliedBeatCuts = null
         appliedScreenDependentRendering = null
         appliedFftScaling = null
@@ -256,6 +286,10 @@ class MilkDropRenderer(
         val currentHandle = handle
         if (currentHandle == 0L) return
 
+        // Keep a restart even if controls were changed and changed back while a heavy
+        // preset blocked rendering. The final desired values still apply only once.
+        if (pendingCountdownRestart.getAndSet(false)) appliedPresetDuration = null
+
         if (pendingTextureRefresh.getAndSet(false)) {
             ProjectMBridge.nativeSetTextureSearchPaths(currentHandle, arrayOf(texturesDir.absolutePath))
         }
@@ -281,9 +315,11 @@ class MilkDropRenderer(
         }
 
         val instant = instantTransitions
-        if (instant != appliedInstantTransitions) {
-            ProjectMBridge.nativeSetSoftCutDuration(currentHandle, if (instant) 0.0 else SOFT_CUT_DURATION_SECONDS)
+        val transition = transitionSeconds
+        if (instant != appliedInstantTransitions || transition != appliedTransitionSeconds) {
+            ProjectMBridge.nativeSetSoftCutDuration(currentHandle, if (instant) 0.0 else transition)
             appliedInstantTransitions = instant
+            appliedTransitionSeconds = transition
         }
 
         val screenDependent = screenDependentRendering
@@ -299,6 +335,11 @@ class MilkDropRenderer(
         }
 
         val duration = presetDurationSeconds
+        val randomDuration = additionalRandomSeconds
+        if (randomDuration != appliedRandomDuration) {
+            ProjectMBridge.nativeSetAdditionalRandomTime(currentHandle, randomDuration)
+            appliedRandomDuration = randomDuration
+        }
         if (duration != appliedPresetDuration) {
             ProjectMBridge.nativeSetPresetDuration(currentHandle, duration)
             appliedPresetDuration = duration
@@ -381,6 +422,5 @@ class MilkDropRenderer(
     private companion object {
         const val TAG = "MilkDropRenderer"
         const val BEAT_CUT_MIN_SECONDS = 5.0
-        const val SOFT_CUT_DURATION_SECONDS = 1.0
     }
 }

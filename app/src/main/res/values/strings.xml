@@ -26,6 +26,20 @@
     <string name="setting_auto_advance">Auto-advance</string>
     <string name="setting_beat_cuts">Change on big beats</string>
     <string name="setting_preset_duration">Time per preset</string>
+    <string name="setting_additional_random">Additional random time</string>
+    <string name="setting_transition_time">Transition time</string>
+    <string-array name="preset_duration_options">
+        <item>10 s</item><item>15 s</item><item>20 s</item><item>25 s</item>
+        <item>30 s</item><item>45 s</item><item>60 s</item>
+    </string-array>
+    <string-array name="additional_random_options">
+        <item>Off</item><item>5 s</item><item>10 s</item><item>15 s</item>
+        <item>20 s</item><item>25 s</item><item>30 s</item>
+    </string-array>
+    <string-array name="transition_time_options">
+        <item>0.5 s</item><item>1 s</item><item>1.5 s</item>
+        <item>1.7 s (default)</item><item>2 s</item><item>5 s</item>
+    </string-array>
     <string name="duration_10">10 s</string>
     <string name="duration_15">15 s</string>
     <string name="duration_30">30 s</string>
@@ -65,6 +79,14 @@
     <string name="fft_shader_noise_floor_value">FFT Shader Noise Floor: %1$.2f</string>
 
     <string name="playlist_search_hint">Search presets…</string>
+    <string name="playlist_no_results">No presets found. Try different search words.</string>
+    <string name="playlist_no_favourite_results">No favourite presets found. Try different search words or turn off the favourites filter.</string>
+    <string name="playlist_empty">No presets available.</string>
+    <string name="playlist_no_favourites">No favourite presets yet.</string>
+    <plurals name="playlist_result_count">
+        <item quantity="one">%d preset found</item>
+        <item quantity="other">%d presets found</item>
+    </plurals>
     <string name="playlist_close">Close</string>
     <string name="presets_loading">Loading presets…</string>
     <string name="visualization_initialization_failed">Unable to start visuals on this device.</string>
