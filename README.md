@@ -93,6 +93,11 @@ reinstalling the app, can be copied to another phone with the presets, and can b
 ## Controls
 
 Tap the visuals to show the controls; tap again to hide them. They stay up until you tap again.
+With the UI hidden, swipe on the visuals to use shortcuts: left selects the previous preset, right selects the
+next, up opens the preset list, and down toggles shuffle with brief status feedback. Swipes
+are disabled while the control bar, Settings or preset list is visible. Sliders and the preset list keep their
+normal touch behavior. Short drags, diagonal drags and multi-touch gestures do not trigger
+shortcuts; touch input still reaches the preset shader pointer variables.
 The preset's name shows at the top while they're up, and for a couple of seconds on each change.
 
 - **Prev / Next** — step through presets. Prev goes back through the presets you actually saw,

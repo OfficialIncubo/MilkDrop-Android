@@ -13,6 +13,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Touchscreen shortcuts on the visualization while the UI is hidden: swipe left/right for previous/next preset,
+  up for the preset list, and down to toggle shuffle. Preserve tap controls, overlay touch
+  handling and shader pointer input; ignore short drags and multi-touch gestures.
 - Remote shortcuts with the UI hidden: OK shows controls, Left/Right change preset,
   Down toggles shuffle, and Up opens the preset list. Hold OK on the control bar to hide it;
   normal D-pad and OK navigation remains available while the UI is visible.

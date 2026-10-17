@@ -559,14 +559,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * A plain tap toggles the controls: tap to show, tap again to hide. No auto-hide, no double-tap.
-     * With the settings sheet open, a tap on the visuals closes it.
+     * Taps toggle controls; surface swipes provide preset/list/shuffle shortcuts.
+     * Overlay views keep their own touch handling, and taps outside settings still close it.
      */
     private fun setupGestures() {
         surfaceView.isFocusable = false // Remote focus belongs to the overlay controls.
         surfaceView.setOnClickListener {
             if (binding.settingsSheet.isVisible) closeSettingsSheet(showControls = false) else toggleControlBar()
         }
+        surfaceView.setOnTouchListener(VisualizationTouchListener(this,
+            canSwipe = {
+                !binding.controlBar.isVisible && !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible
+            },
+            onSwipe = { swipe ->
+                when (swipe) {
+                    VisualizationTouchListener.Swipe.LEFT -> binding.btnPrevious.performClick()
+                    VisualizationTouchListener.Swipe.RIGHT -> binding.btnNext.performClick()
+                    VisualizationTouchListener.Swipe.UP -> {
+                        remoteNavigation = false
+                        openPlaylistPanel()
+                    }
+                    VisualizationTouchListener.Swipe.DOWN -> toggleShuffleWithFeedback()
+                }
+            },
+        ))
+    }
+
+    private fun toggleShuffleWithFeedback() {
+        binding.btnShuffle.performClick()
+        Toast.makeText(this, if (shuffleEnabled) R.string.shuffle_enabled else
+            R.string.shuffle_disabled, Toast.LENGTH_SHORT).show()
     }
 
     private fun setupControlBar() {
@@ -870,11 +892,7 @@ class MainActivity : AppCompatActivity() {
                         when (key) {
                             KeyEvent.KEYCODE_DPAD_LEFT -> binding.btnPrevious.performClick()
                             KeyEvent.KEYCODE_DPAD_RIGHT -> binding.btnNext.performClick()
-                            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                                binding.btnShuffle.performClick()
-                                Toast.makeText(this, if (shuffleEnabled) R.string.shuffle_enabled else
-                                    R.string.shuffle_disabled, Toast.LENGTH_SHORT).show()
-                            }
+                            KeyEvent.KEYCODE_DPAD_DOWN -> toggleShuffleWithFeedback()
                             KeyEvent.KEYCODE_DPAD_UP -> openPlaylistPanel()
                             else -> showRemoteControls()
                         }
