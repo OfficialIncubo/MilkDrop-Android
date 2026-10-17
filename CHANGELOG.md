@@ -16,6 +16,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Recognize shader `#ifdef` and `#ifndef` directives, including nested branches and comments.
+  Fix preprocessing failures in presets such as IkeC - Equalizer that use optional visual modes.
 - Restart the switching countdown when duration or random time changes. Auto-advance off
   resets and holds the countdown at zero; enabling it starts again. Preserve preset animation
   and blends in progress, and discard stale search results after editing or closing the list.

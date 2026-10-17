@@ -62,6 +62,8 @@ Preset shaders can use `get_fft()` / `get_fft_hz()`, `get_fft_peak()` / `get_fft
 and `get_wave()` / `get_wave_left()` / `get_wave_right()`. Shader FFT follows BeatDrop's
 clean FFT, RMS adaptation, smoothing and peak hold. Local date/time and touch/mouse inputs
 are also available to shaders and preset equations, including while using the overlay UI.
+Shader feature checks support `#if`, `#ifdef` and `#ifndef`, including nested branches,
+so optional BeatDrop features can select their supported or fallback code paths.
 See [shader inputs and audio controls](Docs/SHADER_INPUTS.md) for names, coordinate
 conventions, examples and capture limitations. The BeatDrop notice is included in the APK
 at `assets/licenses/BeatDrop.txt`.
