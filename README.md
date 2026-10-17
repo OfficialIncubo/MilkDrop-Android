@@ -103,7 +103,8 @@ their normal interaction sounds, subject to the device's sound settings.
 Closing the preset list depends on how it was opened: swipe up or remote Up
 returns to hidden controls, while the sidebar's List button returns to the sidebar. Selecting
 a preset follows the same rule.
-The preset's name shows at the top while they're up, and for a couple of seconds on each change.
+The preset's name shows at the top while they're up. With **Preset name during transitions**
+enabled, it also appears for a couple of seconds on each preset change.
 
 - **Prev / Next** — step through presets. Prev goes back through the presets you actually saw,
   even with shuffle on.
@@ -141,6 +142,8 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
 - **Auto-advance** — switch preset on a timer. Turning it off resets and holds the switching
   countdown at zero; turning it on starts a fresh countdown. Preset animation keeps running.
 - **Change on big beats** — also switch on a sudden jump in loudness.
+- **Preset name during transitions** — show the brief name popup on preset changes. On by
+  default and saved across launches; turning it off keeps the name available with the sidebar open.
 - **Time per preset** — 10, 15, 20, 25, 30, 45 or 60 seconds. Changing it restarts the countdown.
 - **Additional random time** — Off, 5, 10, 15, 20, 25 or 30 seconds. Adds a fresh random amount
   from zero up to the selected limit per preset. For example, 15 s plus up to 5 s means 15–20 s.

@@ -25,6 +25,7 @@
     <string name="settings_close">Close settings</string>
     <string name="setting_auto_advance">Auto-advance</string>
     <string name="setting_beat_cuts">Change on big beats</string>
+    <string name="setting_preset_name_transitions">Preset name during transitions</string>
     <string name="setting_preset_duration">Time per preset</string>
     <string name="setting_additional_random">Additional random time</string>
     <string name="setting_transition_time">Transition time</string>

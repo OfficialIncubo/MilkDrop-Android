@@ -6,6 +6,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Saved Preset name during transitions toggle after Change on big beats, enabled by default.
+  Disable the preset-change name popup while keeping the name available in the sidebar.
 - Match search words in any order, ignoring case and extra whitespace, and show result
   counts and clear messages for empty search results, empty libraries or no favourites.
 - Time per preset choices of 10, 15, 20, 25, 30, 45 and 60 seconds; Additional random time

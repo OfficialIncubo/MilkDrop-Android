@@ -203,6 +203,15 @@
                     android:textSize="16sp" />
 
                 <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchPresetNameDuringTransitions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/setting_preset_name_transitions"
+                    android:textColor="@color/overlay_content"
+                    android:textSize="16sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchScreenDependentRendering"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

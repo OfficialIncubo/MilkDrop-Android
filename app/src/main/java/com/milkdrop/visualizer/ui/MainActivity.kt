@@ -216,6 +216,7 @@ class MainActivity : AppCompatActivity() {
         updatingControls = true
         binding.switchAutoAdvance.isChecked = autoAdvanceEnabled
         binding.switchBeatCuts.isChecked = beatCutsEnabled
+        binding.switchPresetNameDuringTransitions.isChecked = settings.showPresetNameDuringTransitions
         binding.switchScreenDependentRendering.isChecked = settings.screenDependentRendering
         configureTimingSpinner(binding.spinnerPresetDuration, R.array.preset_duration_options, presetDurationIndex)
         configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
@@ -360,12 +361,16 @@ class MainActivity : AppCompatActivity() {
         updateTopLabel()
     }
 
-    /** The preset name shows while the controls are open, and briefly whenever the preset changes. */
+    /** Keep the sidebar name current; optionally flash it when a preset changes. */
     private fun showPresetName(name: String) {
         currentPresetName = name
-        presetNameShownUntil = SystemClock.uptimeMillis() + PRESET_NAME_FLASH_MS
         binding.presetStatus.removeCallbacks(hidePresetName)
-        binding.presetStatus.postDelayed(hidePresetName, PRESET_NAME_FLASH_MS)
+        presetNameShownUntil = if (settings.showPresetNameDuringTransitions) {
+            SystemClock.uptimeMillis() + PRESET_NAME_FLASH_MS
+        } else 0L
+        if (settings.showPresetNameDuringTransitions) {
+            binding.presetStatus.postDelayed(hidePresetName, PRESET_NAME_FLASH_MS)
+        }
         updateTopLabel()
     }
 
@@ -380,7 +385,8 @@ class MainActivity : AppCompatActivity() {
         // Not with the settings sheet open: in landscape the sheet reaches the top, under the name.
         val name = currentPresetName
         val shown = binding.controlBar.isVisible ||
-            (!binding.settingsSheet.isVisible && SystemClock.uptimeMillis() < presetNameShownUntil)
+            (settings.showPresetNameDuringTransitions && !binding.settingsSheet.isVisible &&
+                SystemClock.uptimeMillis() < presetNameShownUntil)
         label.text = name
         label.isVisible = name != null && shown
     }
@@ -559,7 +565,10 @@ class MainActivity : AppCompatActivity() {
             audioCaptureManager.onAutomaticSourceChanged = null
             audioCaptureManager.stopAll()
         }
-        if (::binding.isInitialized) binding.playlistSearch.removeCallbacks(pendingSearch)
+        if (::binding.isInitialized) {
+            binding.playlistSearch.removeCallbacks(pendingSearch)
+            binding.presetStatus.removeCallbacks(hidePresetName)
+        }
         searchExecutor.shutdownNow()
         ratingsWriter.shutdown() // lets a pending save finish
     }
@@ -651,11 +660,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettingsSheet() {
-        listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchScreenDependentRendering,
+        listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchPresetNameDuringTransitions,
+            binding.switchScreenDependentRendering,
             binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {
             it.setBackgroundResource(R.drawable.remote_focus_background)
         }
         binding.btnCloseSettings.setOnClickListener { closeSettingsSheet(showControls = true) }
+        binding.switchPresetNameDuringTransitions.setOnCheckedChangeListener { _, checked ->
+            if (updatingControls) return@setOnCheckedChangeListener
+            settings.showPresetNameDuringTransitions = checked
+            if (!checked) {
+                presetNameShownUntil = 0L
+                binding.presetStatus.removeCallbacks(hidePresetName)
+            }
+            updateTopLabel()
+        }
         binding.switchScreenDependentRendering.setOnCheckedChangeListener { _, checked ->
             if (updatingControls) return@setOnCheckedChangeListener
             settings.screenDependentRendering = checked

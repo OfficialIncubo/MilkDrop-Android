@@ -39,6 +39,10 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_BEAT_CUTS, false)
         set(value) = prefs.edit().putBoolean(KEY_BEAT_CUTS, value).apply()
 
+    var showPresetNameDuringTransitions: Boolean
+        get() = prefs.getBoolean(KEY_PRESET_NAME_TRANSITIONS, true)
+        set(value) = prefs.edit().putBoolean(KEY_PRESET_NAME_TRANSITIONS, value).apply()
+
     var hardCutEnabled: Boolean
         get() = prefs.getBoolean(KEY_HARD_CUT, false)
         set(value) = prefs.edit().putBoolean(KEY_HARD_CUT, value).apply()
@@ -100,6 +104,7 @@ class AppSettings(context: Context) {
         const val KEY_RANDOM_TIME = "additional_random_seconds"
         const val KEY_TRANSITION_TIME = "transition_seconds"
         const val KEY_BEAT_CUTS = "beat_cuts_enabled"
+        const val KEY_PRESET_NAME_TRANSITIONS = "show_preset_name_during_transitions"
         const val KEY_FPS_INDEX = "fps_index"
         const val KEY_QUALITY_INDEX = "quality_index"
         const val KEY_AUDIO_SENSITIVITY = "audio_sensitivity"
