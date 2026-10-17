@@ -4,6 +4,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-17
+
 ### Fixed
 
 - Check graphics support before creating the renderer. OpenGL ES 2-only projectors show a
