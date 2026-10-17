@@ -11,9 +11,14 @@ class AudioCaptureManager(
     /** Both retained audio sources run in process. */
     private var localSource: AudioSource? = null
 
-    fun startMic() {
-        startLocal(MicAudioSource(context, pcmSink))
-    }
+    fun startMic(): Boolean =
+        try {
+            startLocal(MicAudioSource(context, pcmSink))
+            true
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Microphone capture unavailable", e)
+            false
+        }
 
     /** Returns false if this phone won't give access to the output mix. */
     fun startInternal(): Boolean =

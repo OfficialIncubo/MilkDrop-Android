@@ -42,8 +42,17 @@
     <string name="audio_source_mic">Mic</string>
     <string name="audio_source_internal">Internal</string>
     <string name="audio_source_mic_description">Listens through your microphone, picking up music from speakers and sounds around you.</string>
-    <string name="audio_source_internal_description">Listens to audio playing on your device. Some apps restrict capture, so you may hear silence.</string>
+    <string name="audio_source_internal_description">Listens to audio playing on your device. Some apps block capture, so their audio may not reach the visuals.</string>
     <string name="audio_source_internal_unavailable">Internal audio is unavailable on this device, so the mic is on.</string>
+    <string name="audio_source_mic_unavailable">The microphone is unavailable. Check that another app isn\'t using it, then try again.</string>
+    <string name="audio_source_permission_required">Allow microphone access in Android settings to enable audio input.</string>
+    <string name="setting_audio_sensitivity">Audio sensitivity</string>
+    <string name="audio_sensitivity_value">Audio sensitivity: %1$.1f×</string>
+    <string name="audio_sensitivity_description">Adjusts the audio level used by the visuals without changing playback volume.</string>
+    <string name="setting_fft_shader_scaling">FFT Shader Scaling</string>
+    <string name="fft_shader_scaling_value">FFT Shader Scaling: %1$.2f</string>
+    <string name="setting_fft_shader_noise_floor">FFT Shader Noise Floor</string>
+    <string name="fft_shader_noise_floor_value">FFT Shader Noise Floor: %1$.2f</string>
 
     <string name="playlist_search_hint">Search presets…</string>
     <string name="playlist_close">Close</string>

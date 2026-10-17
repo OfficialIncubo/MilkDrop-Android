@@ -51,12 +51,20 @@ Frequency boundaries and response times are CMake cache options in
 than requiring a fixed input-volume threshold. For example, pass
 `-DMILKDROP_BASS_HIGH_HZ=200` as a native CMake argument to use a 200 Hz crossover.
 
-The frequency reference is 44,100 Hz, matching Mic audio capture. The existing
-capture interface does not carry sample-rate metadata, so Internal uses that reference
-too; its physical frequency boundaries may differ if Android's Visualizer uses another
-sample rate. Treble is limited to the analysis Nyquist frequency. The existing short FFT
+The beat-analysis frequency reference is 44,100 Hz, matching Mic audio capture. Internal
+uses that reference for beat detection too; its physical band boundaries may differ if
+Android's Visualizer uses another sample rate. The separate shader FFT described below
+uses the actual capture sample rate. Treble is limited to the analysis Nyquist frequency. The existing short FFT
 window also limits separation of very low bass frequencies; these bands are approximate,
 not sharp audio filters. This analysis cannot recover audio blocked or omitted by capture.
+
+Preset shaders can use `get_fft()` / `get_fft_hz()`, `get_fft_peak()` / `get_fft_peak_hz()`,
+and `get_wave()` / `get_wave_left()` / `get_wave_right()`. Shader FFT follows BeatDrop's
+clean FFT, RMS adaptation, smoothing and peak hold. Local date/time and touch/mouse inputs
+are also available to shaders and preset equations, including while using the overlay UI.
+See [shader inputs and audio controls](Docs/SHADER_INPUTS.md) for names, coordinate
+conventions, examples and capture limitations. The BeatDrop notice is included in the APK
+at `assets/licenses/BeatDrop.txt`.
 
 ## Setting up presets
 
@@ -131,6 +139,12 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
   - *Mic* — the microphone; works with any player and picks up the room.
   - *Internal* — what the phone plays through Android's `Visualizer` API, without a prompt.
     Apps that block capture come through silent.
+- **Audio sensitivity** — 0–10× input gain for the visuals; default 1.0×.
+- **FFT Shader Scaling** — 0–2; default 0.45.
+- **FFT Shader Noise Floor** — 0–1; default 0.10.
+
+The audio sliders apply immediately and are saved. Audio sensitivity affects the samples
+used for visualization, while FFT scaling and noise floor adjust shader FFT output.
 
 The app supports Android 9 (API 28) and newer on 32-bit and 64-bit ARM and x86 devices.
 

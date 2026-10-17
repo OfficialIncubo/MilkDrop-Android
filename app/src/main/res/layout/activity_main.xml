@@ -346,6 +346,49 @@
                     android:textColor="@color/overlay_content_secondary"
                     android:textSize="13sp" />
 
+                <TextView
+                    android:id="@+id/audioSensitivityLabel"
+                    style="@style/SettingLabel"
+                    android:labelFor="@id/sliderAudioSensitivity"
+                    android:text="@string/setting_audio_sensitivity" />
+
+                <SeekBar
+                    android:id="@+id/sliderAudioSensitivity"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:max="100" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/audio_sensitivity_description"
+                    android:textColor="@color/overlay_content_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/fftShaderScalingLabel"
+                    style="@style/SettingLabel"
+                    android:labelFor="@id/sliderFftShaderScaling"
+                    android:text="@string/setting_fft_shader_scaling" />
+
+                <SeekBar
+                    android:id="@+id/sliderFftShaderScaling"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:max="200" />
+
+                <TextView
+                    android:id="@+id/fftShaderNoiseFloorLabel"
+                    style="@style/SettingLabel"
+                    android:labelFor="@id/sliderFftShaderNoiseFloor"
+                    android:text="@string/setting_fft_shader_noise_floor" />
+
+                <SeekBar
+                    android:id="@+id/sliderFftShaderNoiseFloor"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:max="100" />
+
             </LinearLayout>
 
         </ScrollView>

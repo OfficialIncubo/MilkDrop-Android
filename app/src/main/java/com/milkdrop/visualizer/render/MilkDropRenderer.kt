@@ -3,6 +3,7 @@ package com.milkdrop.visualizer.render
 import android.opengl.GLSurfaceView
 import android.os.SystemClock
 import android.util.Log
+import com.milkdrop.visualizer.settings.AudioTuning
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -76,6 +77,33 @@ class MilkDropRenderer(
     @Volatile
     var screenDependentRendering: Boolean = false
 
+    @Volatile
+    var audioSensitivity: Float = AudioTuning.SENSITIVITY_DEFAULT
+
+    @Volatile
+    var fftShaderScaling: Float = AudioTuning.FFT_SCALING_DEFAULT
+
+    @Volatile
+    var fftShaderNoiseFloor: Float = AudioTuning.FFT_NOISE_FLOOR_DEFAULT
+
+    private data class PointerState(val x: Float = -1.0f, val y: Float = -1.0f,
+        val down: Boolean = false, val released: Boolean = false)
+    private val pointer = AtomicReference(PointerState())
+
+    /** Positions cover the whole visualization, including touches delivered to overlay controls. */
+    fun updatePointer(x: Float, y: Float, down: Boolean, released: Boolean = false) {
+        pointer.updateAndGet { previous -> PointerState(x, y, down, previous.released || released) }
+    }
+
+    fun clearPointer() {
+        pointer.set(PointerState())
+    }
+
+    private fun applyPointer() {
+        val state = pointer.getAndUpdate { if (it.released) it.copy(released = false) else it }
+        ProjectMBridge.nativeSetPointer(handle, state.x, state.y, state.down, state.released)
+    }
+
     private var appliedShuffle: Boolean? = null
     private var appliedAutoAdvance: Boolean? = null
     private var appliedInstantTransitions: Boolean? = null
@@ -83,6 +111,8 @@ class MilkDropRenderer(
     private var appliedPresetDuration: Double? = null
     private var appliedBeatCuts: Boolean? = null
     private var appliedScreenDependentRendering: Boolean? = null
+    private var appliedFftScaling: Float? = null
+    private var appliedFftNoiseFloor: Float? = null
 
     private val pendingNavigation = AtomicReference<Navigation?>(null)
     private val pendingTextureRefresh = AtomicBoolean(false)
@@ -159,12 +189,15 @@ class MilkDropRenderer(
         appliedPresetDuration = null
         appliedBeatCuts = null
         appliedScreenDependentRendering = null
+        appliedFftScaling = null
+        appliedFftNoiseFloor = null
         // Until a preset list is handed over (see loadScannedPresets), projectM just shows its
         // built-in idle preset.
         loadedPaths = null
         lastReportedPath = null
         frameRateMeter.reset()
         reportedFps = 0
+        applyPointer()
         applyPendingState()
     }
 
@@ -188,6 +221,7 @@ class MilkDropRenderer(
         if (handle == 0L) return
         val frameStartNanos = System.nanoTime()
         performanceHints.onFrameStart(frameStartNanos)
+        applyPointer()
         applyPendingState()
         reportFrameRate(frameStartNanos)
         ProjectMBridge.nativeRenderFrame(handle)
@@ -224,6 +258,14 @@ class MilkDropRenderer(
 
         if (pendingTextureRefresh.getAndSet(false)) {
             ProjectMBridge.nativeSetTextureSearchPaths(currentHandle, arrayOf(texturesDir.absolutePath))
+        }
+
+        val scaling = fftShaderScaling
+        val noiseFloor = fftShaderNoiseFloor
+        if (scaling != appliedFftScaling || noiseFloor != appliedFftNoiseFloor) {
+            ProjectMBridge.nativeSetShaderAudioSettings(currentHandle, scaling, noiseFloor)
+            appliedFftScaling = scaling
+            appliedFftNoiseFloor = noiseFloor
         }
 
         val shuffle = shuffleEnabled
@@ -315,11 +357,12 @@ class MilkDropRenderer(
         Log.d(TAG, "$navigation -> #$position loaded in ${SystemClock.elapsedRealtime() - startMs} ms")
     }
 
-    fun feedPcm(samples: ShortArray, frameCount: Int, channels: Int) {
+    fun feedPcm(samples: ShortArray, frameCount: Int, channels: Int, sampleRateHz: Int, snapshot: Boolean) {
         synchronized(pcmLock) {
             val currentHandle = handle
             if (currentHandle != 0L) {
-                ProjectMBridge.nativeFeedPcmInt16(currentHandle, samples, frameCount, channels)
+                ProjectMBridge.nativeFeedPcmInt16(currentHandle, samples, frameCount, channels,
+                    sampleRateHz, snapshot, audioSensitivity)
             }
         }
     }

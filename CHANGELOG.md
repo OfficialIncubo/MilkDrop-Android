@@ -2,6 +2,25 @@
 
 All notable changes to this app. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Shader functions `get_fft_peak()`, `get_fft_peak_hz()`, `get_wave()`, `get_wave_left()` and
+  `get_wave_right()`, alongside a BeatDrop-style clean FFT for `get_fft()` and `get_fft_hz()`.
+- Local system date/time and pointer inputs for shaders and preset equations. Touch input
+  remains available while interacting with controls, settings and the preset list.
+- Live, saved sliders for audio sensitivity (0–10×), FFT Shader Scaling (0–2, default 0.45),
+  and FFT Shader Noise Floor (0–1, default 0.10).
+
+### Changed
+
+- Shader Hz lookups follow the capture sample rate; overlapping Internal audio snapshots
+  are analyzed without concatenating them into a false continuous waveform.
+- Launcher icon now uses the supplied MilkDrop spiral artwork.
+- Denied recording permission and unavailable microphone input display an explanation
+  instead of failing during audio startup.
+
 ## [1.1.0] - 2026-10-03
 
 ### Added

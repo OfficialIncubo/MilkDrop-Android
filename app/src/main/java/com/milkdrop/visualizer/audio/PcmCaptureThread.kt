@@ -43,7 +43,7 @@ internal class PcmCaptureThread(
                     }
                     if (read > 0 && running.get()) {
                         val frameCount = read / channels
-                        sink(buffer, frameCount, channels)
+                        sink(buffer, frameCount, channels, audioRecord.sampleRate, false)
                     }
                 }
             } catch (e: RuntimeException) {

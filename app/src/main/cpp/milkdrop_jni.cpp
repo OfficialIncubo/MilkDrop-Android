@@ -2,6 +2,8 @@
 #include <android/log.h>
 #include <sched.h>
 #include <cerrno>
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -16,6 +18,9 @@
 #include <projectM-4/playlist_memory.h>
 #include <projectM-4/playlist_playback.h>
 
+#include "projectm/ShaderAudioApi.hpp"
+#include "projectm/ShaderInputs.hpp"
+
 namespace {
 
 struct BridgeHandle {
@@ -23,6 +28,9 @@ struct BridgeHandle {
     projectm_playlist_handle playlist = nullptr;
     // Written only by successful playlist switch callbacks on the GL thread.
     std::string activePresetPath;
+    std::vector<float> pcmScratch;
+    int sampleRateHz = 0;
+    bool audioSnapshot = false;
 
     ~BridgeHandle() {
         if (playlist != nullptr) projectm_playlist_destroy(playlist);
@@ -137,6 +145,19 @@ JNIEXPORT void JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeRenderFrame(JNIEnv*, jobject, jlong handlePtr) {
     projectm_handle projectM = AsHandle(handlePtr)->projectM;
     SafeCall([&] { projectm_opengl_render_frame(projectM); });
+}
+
+JNIEXPORT void JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetShaderAudioSettings(
+        JNIEnv*, jobject, jlong handlePtr, jfloat scaling, jfloat noiseFloor) {
+    SafeCall([&] { milkdrop_set_shader_audio_settings(AsHandle(handlePtr)->projectM, scaling, noiseFloor); });
+}
+
+JNIEXPORT void JNICALL
+Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetPointer(
+        JNIEnv*, jobject, jlong handlePtr, jfloat x, jfloat y, jboolean down, jboolean released) {
+    SafeCall([&] { milkdrop_set_pointer(AsHandle(handlePtr)->projectM, x, y,
+                                       down == JNI_TRUE, released == JNI_TRUE); });
 }
 
 JNIEXPORT void JNICALL
@@ -318,14 +339,35 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetPlaylistPosition(
 
 JNIEXPORT void JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeFeedPcmInt16(
-        JNIEnv* env, jobject, jlong handlePtr, jshortArray samples, jint frameCount, jint channels) {
-    jshort* data = env->GetShortArrayElements(samples, nullptr);
-    projectm_channels channelEnum = (channels == 2) ? PROJECTM_STEREO : PROJECTM_MONO;
-    projectm_pcm_add_int16(AsHandle(handlePtr)->projectM,
-                            reinterpret_cast<const int16_t*>(data),
-                            static_cast<unsigned int>(frameCount),
-                            channelEnum);
-    env->ReleaseShortArrayElements(samples, data, JNI_ABORT);
+        JNIEnv* env, jobject, jlong handlePtr, jshortArray samples, jint frameCount, jint channels,
+        jint sampleRateHz, jboolean snapshot, jfloat sensitivity) {
+    if (!samples || frameCount <= 0 || (channels != 1 && channels != 2)) return;
+    auto* handle = AsHandle(handlePtr);
+    if (!handle) return;
+    const int frames = std::min(frameCount, env->GetArrayLength(samples) / channels);
+    if (frames <= 0) return;
+    SafeCall([&] {
+        const int rate = sampleRateHz > 0 ? sampleRateHz : 44100;
+        const bool isSnapshot = snapshot == JNI_TRUE;
+        if (rate != handle->sampleRateHz || isSnapshot != handle->audioSnapshot) {
+            milkdrop_set_audio_input_format(handle->projectM, static_cast<uint32_t>(rate), isSnapshot);
+            handle->sampleRateHz = rate;
+            handle->audioSnapshot = isSnapshot;
+        }
+        const size_t sampleCount = static_cast<size_t>(frames) * channels;
+        handle->pcmScratch.resize(sampleCount);
+        jshort* data = env->GetShortArrayElements(samples, nullptr);
+        if (!data) return;
+        const float gain = std::isfinite(sensitivity) ? std::clamp(sensitivity, 0.0f, 10.0f) : 1.0f;
+        // Float input preserves boosted detail; converting back to PCM16 would clip it first.
+        for (size_t i = 0; i < sampleCount; ++i) {
+            handle->pcmScratch[i] = static_cast<float>(data[i]) * (gain / 32768.0f);
+        }
+        env->ReleaseShortArrayElements(samples, data, JNI_ABORT);
+        projectm_pcm_add_float(handle->projectM, handle->pcmScratch.data(),
+                              static_cast<unsigned int>(frames),
+                              channels == 2 ? PROJECTM_STEREO : PROJECTM_MONO);
+    });
 }
 
 // Restricts the given threads of this process to the given CPU cores. Java has no API for thread

@@ -44,6 +44,8 @@ class InternalAudioSource(private val sink: PcmSink) : AudioSource {
     }
 
     private class Capture(effect: Visualizer, captureSize: Int, sink: PcmSink) {
+        // Visualizer reports milliHertz. Shader Hz lookups must use this device's actual rate.
+        private val sampleRateHz = (effect.samplingRate / 1000).takeIf { it > 0 } ?: 44100
         val running = AtomicBoolean(true)
         val thread = Thread({
             val waveform = ByteArray(captureSize)
@@ -60,7 +62,7 @@ class InternalAudioSource(private val sink: PcmSink) : AudioSource {
                         // Unsigned 8-bit, 128 = silence, to signed 16-bit.
                         samples[i] = (((waveform[i].toInt() and 0xFF) - 128) shl 8).toShort()
                     }
-                    if (running.get()) sink(samples, captureSize, MONO)
+                    if (running.get()) sink(samples, captureSize, MONO, sampleRateHz, true)
                     // Poll fresh data after a stall; never queue snapshots to replay later.
                     Thread.sleep(POLL_INTERVAL_MS)
                 }

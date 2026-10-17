@@ -40,6 +40,24 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_QUALITY_INDEX, 0)
         set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX, value).apply()
 
+    var audioSensitivity: Float
+        get() = AudioTuning.bounded(prefs.getFloat(KEY_AUDIO_SENSITIVITY, AudioTuning.SENSITIVITY_DEFAULT),
+            AudioTuning.SENSITIVITY_MAX, AudioTuning.SENSITIVITY_DEFAULT)
+        set(value) = prefs.edit().putFloat(KEY_AUDIO_SENSITIVITY,
+            AudioTuning.bounded(value, AudioTuning.SENSITIVITY_MAX, AudioTuning.SENSITIVITY_DEFAULT)).apply()
+
+    var fftShaderScaling: Float
+        get() = AudioTuning.bounded(prefs.getFloat(KEY_FFT_SCALING, AudioTuning.FFT_SCALING_DEFAULT),
+            AudioTuning.FFT_SCALING_MAX, AudioTuning.FFT_SCALING_DEFAULT)
+        set(value) = prefs.edit().putFloat(KEY_FFT_SCALING,
+            AudioTuning.bounded(value, AudioTuning.FFT_SCALING_MAX, AudioTuning.FFT_SCALING_DEFAULT)).apply()
+
+    var fftShaderNoiseFloor: Float
+        get() = AudioTuning.bounded(prefs.getFloat(KEY_FFT_NOISE_FLOOR, AudioTuning.FFT_NOISE_FLOOR_DEFAULT),
+            AudioTuning.FFT_NOISE_FLOOR_MAX, AudioTuning.FFT_NOISE_FLOOR_DEFAULT)
+        set(value) = prefs.edit().putFloat(KEY_FFT_NOISE_FLOOR,
+            AudioTuning.bounded(value, AudioTuning.FFT_NOISE_FLOOR_MAX, AudioTuning.FFT_NOISE_FLOOR_DEFAULT)).apply()
+
     /** Reads previous audio choices and maps both playback modes to the retained Internal source. */
     var audioInput: AudioInput
         get() = prefs.getString(KEY_AUDIO_INPUT, null)
@@ -66,6 +84,9 @@ class AppSettings(context: Context) {
         const val KEY_BEAT_CUTS = "beat_cuts_enabled"
         const val KEY_FPS_INDEX = "fps_index"
         const val KEY_QUALITY_INDEX = "quality_index"
+        const val KEY_AUDIO_SENSITIVITY = "audio_sensitivity"
+        const val KEY_FFT_SCALING = "fft_shader_scaling"
+        const val KEY_FFT_NOISE_FLOOR = "fft_shader_noise_floor"
         const val KEY_SCREEN_DEPENDENT_RENDERING = "screen_dependent_rendering"
         const val KEY_AUDIO_SOURCE_INTERNAL = "audio_source_internal"
         const val KEY_AUDIO_INPUT = "audio_input"

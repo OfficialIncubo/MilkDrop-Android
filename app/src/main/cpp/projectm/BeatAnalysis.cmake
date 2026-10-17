@@ -1,6 +1,6 @@
 # Replace only projectM's band analysis, in build-directory copies. Capture APIs, audio
 # modes, waveform data, and the spectrum exposed to presets are unchanged.
-set(MILKDROP_ANALYSIS_SAMPLE_RATE 44100 CACHE STRING "PCM frequency reference in Hz (capture modes do not supply sample-rate metadata)")
+set(MILKDROP_ANALYSIS_SAMPLE_RATE 44100 CACHE STRING "Legacy band-analysis frequency reference in Hz (shader FFT uses capture metadata)")
 set(MILKDROP_BASS_LOW_HZ 20 CACHE STRING "Lowest analyzed bass frequency")
 set(MILKDROP_BASS_HIGH_HZ 250 CACHE STRING "Bass/mid crossover")
 set(MILKDROP_MID_HIGH_HZ 4000 CACHE STRING "Mid/treble crossover")

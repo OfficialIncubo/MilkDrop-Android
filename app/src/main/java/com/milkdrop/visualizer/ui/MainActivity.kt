@@ -13,11 +13,14 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioGroup
+import android.widget.SeekBar
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -44,9 +47,11 @@ import com.milkdrop.visualizer.render.MilkDropRenderer.MeshSize
 import com.milkdrop.visualizer.render.MilkDropRenderer.Navigation
 import com.milkdrop.visualizer.render.MilkDropSurfaceView
 import com.milkdrop.visualizer.settings.AppSettings
+import com.milkdrop.visualizer.settings.AudioTuning
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
@@ -77,6 +82,8 @@ class MainActivity : AppCompatActivity() {
     private var searchGeneration = 0
     private var fpsIndex = 0
     private var qualityIndex = 0
+    private var activeTouchPointer = -1
+    private val pointerWindowOrigin = IntArray(2)
 
     /** Set while code (not the user) changes a setting's selection, so its listener ignores it. */
     private var updatingControls = false
@@ -137,8 +144,8 @@ class MainActivity : AppCompatActivity() {
         binding.surfaceContainer.addView(surfaceView)
         applyRestoredRenderSettings()
 
-        audioCaptureManager = AudioCaptureManager(this) { samples, frameCount, channels ->
-            surfaceView.milkDropRenderer.feedPcm(samples, frameCount, channels)
+        audioCaptureManager = AudioCaptureManager(this) { samples, frameCount, channels, sampleRateHz, snapshot ->
+            surfaceView.milkDropRenderer.feedPcm(samples, frameCount, channels, sampleRateHz, snapshot)
         }
 
         setupGestures()
@@ -164,6 +171,13 @@ class MainActivity : AppCompatActivity() {
         binding.groupFrameRate.check(FPS_BUTTON_IDS[fpsIndex])
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
         binding.groupAudioSource.check(AUDIO_INPUT_BUTTON_IDS.getValue(settings.audioInput))
+        binding.sliderAudioSensitivity.max = (AudioTuning.SENSITIVITY_MAX * 10).roundToInt()
+        binding.sliderAudioSensitivity.progress = (settings.audioSensitivity * 10).roundToInt()
+        binding.sliderFftShaderScaling.max = (AudioTuning.FFT_SCALING_MAX * 100).roundToInt()
+        binding.sliderFftShaderScaling.progress = (settings.fftShaderScaling * 100).roundToInt()
+        binding.sliderFftShaderNoiseFloor.max = (AudioTuning.FFT_NOISE_FLOOR_MAX * 100).roundToInt()
+        binding.sliderFftShaderNoiseFloor.progress = (settings.fftShaderNoiseFloor * 100).roundToInt()
+        updateAudioTuningLabels()
         updatingControls = false
         binding.audioSourceDescription.setText(AUDIO_INPUT_DESCRIPTIONS.getValue(settings.audioInput))
     }
@@ -179,6 +193,9 @@ class MainActivity : AppCompatActivity() {
         surfaceView.milkDropRenderer.presetDurationSeconds = PRESET_DURATIONS_SECONDS[presetDurationIndex]
         surfaceView.milkDropRenderer.beatCutsEnabled = beatCutsEnabled
         surfaceView.milkDropRenderer.screenDependentRendering = settings.screenDependentRendering
+        surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
+        surfaceView.milkDropRenderer.fftShaderScaling = settings.fftShaderScaling
+        surfaceView.milkDropRenderer.fftShaderNoiseFloor = settings.fftShaderNoiseFloor
         surfaceView.targetFps = FPS_OPTIONS[fpsIndex]
         applyQuality()
     }
@@ -399,8 +416,72 @@ class MainActivity : AppCompatActivity() {
         hadStorageAccess = storageAccess
     }
 
+    /** Observe at the Activity boundary so buttons, sliders and the preset list still feed touches. */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (::surfaceView.isInitialized) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    activeTouchPointer = event.getPointerId(event.actionIndex)
+                    sendPointer(event, event.actionIndex, true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val index = event.findPointerIndex(activeTouchPointer)
+                    if (index >= 0) sendPointer(event, index, true)
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    if (event.getPointerId(event.actionIndex) == activeTouchPointer) {
+                        val next = (0 until event.pointerCount).firstOrNull { it != event.actionIndex }
+                        if (next != null) {
+                            activeTouchPointer = event.getPointerId(next)
+                            sendPointer(event, next, true)
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    sendPointer(event, event.actionIndex, false, released = true)
+                    activeTouchPointer = -1
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    activeTouchPointer = -1
+                    surfaceView.milkDropRenderer.clearPointer()
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (::surfaceView.isInitialized && event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE,
+                MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE -> {
+                    val down = event.buttonState and (MotionEvent.BUTTON_PRIMARY or MotionEvent.BUTTON_SECONDARY) != 0
+                    val released = event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE &&
+                        event.actionButton and (MotionEvent.BUTTON_PRIMARY or MotionEvent.BUTTON_SECONDARY) != 0
+                    sendPointer(event, 0, down, released)
+                }
+                MotionEvent.ACTION_HOVER_EXIT -> surfaceView.milkDropRenderer.clearPointer()
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    private fun sendPointer(event: MotionEvent, index: Int, down: Boolean, released: Boolean = false) {
+        val viewport = binding.surfaceContainer
+        if (viewport.width <= 0 || viewport.height <= 0) return
+        viewport.getLocationInWindow(pointerWindowOrigin)
+        val x = (event.getX(index) - pointerWindowOrigin[0]) / viewport.width
+        val y = (event.getY(index) - pointerWindowOrigin[1]) / viewport.height
+        val inside = x in 0.0f..1.0f && y in 0.0f..1.0f
+        surfaceView.milkDropRenderer.updatePointer(
+            if (inside) x else -1.0f, if (inside) y else -1.0f, down, released,
+        )
+    }
+
     override fun onPause() {
         super.onPause()
+        activeTouchPointer = -1
+        surfaceView.milkDropRenderer.clearPointer()
         surfaceView.onPause()
     }
 
@@ -514,6 +595,38 @@ class MainActivity : AppCompatActivity() {
             audioCaptureManager.stopAll()
             startAudioInput(AUDIO_INPUT_BUTTON_IDS.entries.first { it.value == id }.key)
         }
+        binding.sliderAudioSensitivity.onUserProgress { progress ->
+            settings.audioSensitivity = progress / 10.0f
+            surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
+            updateAudioTuningLabels()
+        }
+        binding.sliderFftShaderScaling.onUserProgress { progress ->
+            settings.fftShaderScaling = progress / 100.0f
+            surfaceView.milkDropRenderer.fftShaderScaling = settings.fftShaderScaling
+            updateAudioTuningLabels()
+        }
+        binding.sliderFftShaderNoiseFloor.onUserProgress { progress ->
+            settings.fftShaderNoiseFloor = progress / 100.0f
+            surfaceView.milkDropRenderer.fftShaderNoiseFloor = settings.fftShaderNoiseFloor
+            updateAudioTuningLabels()
+        }
+    }
+
+    private fun updateAudioTuningLabels() {
+        binding.audioSensitivityLabel.text = getString(R.string.audio_sensitivity_value, settings.audioSensitivity)
+        binding.fftShaderScalingLabel.text = getString(R.string.fft_shader_scaling_value, settings.fftShaderScaling)
+        binding.fftShaderNoiseFloorLabel.text = getString(R.string.fft_shader_noise_floor_value, settings.fftShaderNoiseFloor)
+    }
+
+    private fun SeekBar.onUserProgress(action: (Int) -> Unit) {
+        keyProgressIncrement = 1
+        setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser && !updatingControls) action(progress)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
     }
 
     /** Runs [action] when the user picks a different option, not when code changes the selection. */
@@ -680,22 +793,30 @@ class MainActivity : AppCompatActivity() {
     private fun startPersistedAudioSource() = startAudioInput(settings.audioInput)
 
     private fun startAudioInput(input: AudioInput) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED) {
+            audioCaptureManager.stopAll()
+            showAudioInput(input)
+            binding.audioSourceDescription.setText(R.string.audio_source_permission_required)
+            return
+        }
         when (input) {
             AudioInput.MIC -> switchToMic()
             AudioInput.INTERNAL ->
                 if (audioCaptureManager.startInternal()) {
                     showAudioInput(AudioInput.INTERNAL)
-                } else {
-                    switchToMic()
+                } else if (switchToMic()) {
                     binding.audioSourceDescription.setText(R.string.audio_source_internal_unavailable)
                 }
         }
     }
 
     /** Fallback when another source is unavailable; also updates the saved selection to Mic. */
-    private fun switchToMic() {
-        audioCaptureManager.startMic()
+    private fun switchToMic(): Boolean {
+        val started = audioCaptureManager.startMic()
         showAudioInput(AudioInput.MIC)
+        if (!started) binding.audioSourceDescription.setText(R.string.audio_source_mic_unavailable)
+        return started
     }
 
     /** Saves [input] and shows it as selected, with its description. */
