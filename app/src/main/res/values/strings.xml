@@ -44,7 +44,7 @@
     <string name="quality_medium">Medium</string>
     <string name="quality_high">High</string>
     <string name="setting_audio_source">Audio source</string>
-    <string name="audio_source_mic">Mic</string>
+    <string name="audio_source_mic">Microphone</string>
     <string name="audio_source_internal">Internal</string>
     <string name="audio_source_automatic">Auto</string>
     <string name="audio_source_automatic_description">Uses Internal audio when available and the microphone during silence. Switches back when playback resumes.</string>

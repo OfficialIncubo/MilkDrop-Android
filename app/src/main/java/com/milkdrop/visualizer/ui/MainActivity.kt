@@ -573,8 +573,8 @@ class MainActivity : AppCompatActivity() {
             },
             onSwipe = { swipe ->
                 when (swipe) {
-                    VisualizationTouchListener.Swipe.LEFT -> binding.btnPrevious.performClick()
-                    VisualizationTouchListener.Swipe.RIGHT -> binding.btnNext.performClick()
+                    VisualizationTouchListener.Swipe.LEFT -> binding.btnNext.performClick()
+                    VisualizationTouchListener.Swipe.RIGHT -> binding.btnPrevious.performClick()
                     VisualizationTouchListener.Swipe.UP -> {
                         remoteNavigation = false
                         openPlaylistPanel()

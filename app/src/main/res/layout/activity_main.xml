@@ -327,6 +327,11 @@
                     style="@style/SegmentedGroup">
 
                     <RadioButton
+                        android:id="@+id/audioSourceAutomatic"
+                        style="@style/Segment"
+                        android:text="@string/audio_source_automatic" />
+
+                    <RadioButton
                         android:id="@+id/audioSourceMic"
                         style="@style/Segment"
                         android:text="@string/audio_source_mic" />
@@ -335,11 +340,6 @@
                         android:id="@+id/audioSourceInternal"
                         style="@style/Segment"
                         android:text="@string/audio_source_internal" />
-
-                    <RadioButton
-                        android:id="@+id/audioSourceAutomatic"
-                        style="@style/Segment"
-                        android:text="@string/audio_source_automatic" />
 
                 </RadioGroup>
 

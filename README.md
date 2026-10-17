@@ -93,8 +93,8 @@ reinstalling the app, can be copied to another phone with the presets, and can b
 ## Controls
 
 Tap the visuals to show the controls; tap again to hide them. They stay up until you tap again.
-With the UI hidden, swipe on the visuals to use shortcuts: left selects the previous preset, right selects the
-next, up opens the preset list, and down toggles shuffle with brief status feedback. Swipes
+With the UI hidden, swipe on the visuals to use shortcuts: right selects the previous preset,
+left selects the next, up opens the preset list, and down toggles shuffle with brief status feedback. Swipes
 are disabled while the control bar, Settings or preset list is visible. Sliders and the preset list keep their
 normal touch behavior. Short drags, diagonal drags and multi-touch gestures do not trigger
 shortcuts; touch input still reaches the preset shader pointer variables.
@@ -141,14 +141,14 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
   motion to full-screen coordinates, following BeatDrop's screen-dependent convention. Off by
   default for standard projectM rendering. Applies immediately and is saved across launches.
 - **Audio source**:
-  - *Mic* — the microphone; works with any player and picks up the room.
-  - *Internal* — what the phone plays through Android's `Visualizer` API, without a prompt.
-    Apps that block capture come through silent.
   - *Auto* — uses Internal when sound is available, falls back to the microphone after
     about 1.2 seconds of silence, and returns to Internal after about 100 ms of sustained
     sound. Brief pauses do not trigger a switch. The description shows the source in use.
     Internal monitoring continues while the microphone is active, and unavailable capture
     sources are retried. Blocked playback also triggers the microphone fallback.
+  - *Microphone* — the microphone; works with any player and picks up the room.
+  - *Internal* — what the phone plays through Android's `Visualizer` API, without a prompt.
+    Apps that block capture come through silent.
 - **Audio sensitivity** — 0–10× input gain for the visuals; default 1.0×.
 - **FFT Shader Scaling** — 0–2; default 0.45.
 - **FFT Shader Noise Floor** — 0–1; default 0.10.
