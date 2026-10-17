@@ -21,6 +21,9 @@ internal class PcmCaptureThread(
     private val running = AtomicBoolean(false)
     private var thread: Thread? = null
 
+    val isRunning: Boolean
+        get() = running.get()
+
     @SuppressLint("MissingPermission")
     fun start() {
         if (!running.compareAndSet(false, true)) return
@@ -58,12 +61,14 @@ internal class PcmCaptureThread(
     }
 
     fun stop() {
-        if (!running.compareAndSet(true, false)) return
+        val wasRunning = running.getAndSet(false)
         // Stop first to unblock an in-flight read, then wait for the worker to release the recorder.
-        try {
-            audioRecord.stop()
-        } catch (_: IllegalStateException) {
-            // The worker may already have exited and released the recorder.
+        if (wasRunning) {
+            try {
+                audioRecord.stop()
+            } catch (_: IllegalStateException) {
+                // The worker may already have exited and released the recorder.
+            }
         }
         thread?.join(500)
         thread = null

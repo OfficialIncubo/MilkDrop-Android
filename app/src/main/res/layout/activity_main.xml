@@ -336,6 +336,11 @@
                         style="@style/Segment"
                         android:text="@string/audio_source_internal" />
 
+                    <RadioButton
+                        android:id="@+id/audioSourceAutomatic"
+                        style="@style/Segment"
+                        android:text="@string/audio_source_automatic" />
+
                 </RadioGroup>
 
                 <TextView

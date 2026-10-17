@@ -4,6 +4,7 @@ package com.milkdrop.visualizer.audio
 typealias PcmSink = (samples: ShortArray, frameCount: Int, channels: Int, sampleRateHz: Int, snapshot: Boolean) -> Unit
 
 interface AudioSource {
+    val isRunning: Boolean
     fun start()
     fun stop()
 }

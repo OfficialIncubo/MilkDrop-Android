@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private var searchGeneration = 0
     private var fpsIndex = 0
     private var qualityIndex = 0
+    private var resumeAutomaticAudio = false
     private var activeTouchPointer = -1
     private val pointerWindowOrigin = IntArray(2)
 
@@ -146,6 +147,18 @@ class MainActivity : AppCompatActivity() {
 
         audioCaptureManager = AudioCaptureManager(this) { samples, frameCount, channels, sampleRateHz, snapshot ->
             surfaceView.milkDropRenderer.feedPcm(samples, frameCount, channels, sampleRateHz, snapshot)
+        }
+        audioCaptureManager.onAutomaticSourceChanged = {
+            runOnUiThread {
+                if (!isDestroyed && settings.audioInput == AudioInput.AUTOMATIC) {
+                    val description = when (audioCaptureManager.automaticInput) {
+                        AudioInput.INTERNAL -> R.string.audio_source_automatic_internal
+                        AudioInput.MIC -> R.string.audio_source_automatic_mic
+                        else -> R.string.audio_source_automatic_unavailable
+                    }
+                    binding.audioSourceDescription.setText(description)
+                }
+            }
         }
 
         setupGestures()
@@ -407,6 +420,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         surfaceView.onResume()
+        if (resumeAutomaticAudio) {
+            resumeAutomaticAudio = false
+            if (settings.audioInput == AudioInput.AUTOMATIC) startPersistedAudioSource()
+        }
         val storageAccess = hasAllFilesAccess()
         if (storageAccess && !hadStorageAccess) {
             ratings = PresetRatings(ratingsStore.loadFavourites(), ratingsStore.loadHidden(), ratingsStore::save)
@@ -480,6 +497,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (settings.audioInput == AudioInput.AUTOMATIC) {
+            resumeAutomaticAudio = true
+            audioCaptureManager.stopAll()
+        }
         activeTouchPointer = -1
         surfaceView.milkDropRenderer.clearPointer()
         surfaceView.onPause()
@@ -802,6 +823,11 @@ class MainActivity : AppCompatActivity() {
         }
         when (input) {
             AudioInput.MIC -> switchToMic()
+            AudioInput.AUTOMATIC -> {
+                if (audioCaptureManager.startAutomatic()) {
+                    showAudioInput(AudioInput.AUTOMATIC)
+                } else switchToMic()
+            }
             AudioInput.INTERNAL ->
                 if (audioCaptureManager.startInternal()) {
                     showAudioInput(AudioInput.INTERNAL)
@@ -854,10 +880,12 @@ class MainActivity : AppCompatActivity() {
         val AUDIO_INPUT_BUTTON_IDS = mapOf(
             AudioInput.MIC to R.id.audioSourceMic,
             AudioInput.INTERNAL to R.id.audioSourceInternal,
+            AudioInput.AUTOMATIC to R.id.audioSourceAutomatic,
         )
         val AUDIO_INPUT_DESCRIPTIONS = mapOf(
             AudioInput.MIC to R.string.audio_source_mic_description,
             AudioInput.INTERNAL to R.string.audio_source_internal_description,
+            AudioInput.AUTOMATIC to R.string.audio_source_automatic_description,
         )
     }
 }

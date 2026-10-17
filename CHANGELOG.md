@@ -11,6 +11,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Auto audio source: prefer Internal playback, use the microphone during silence or when
+  Internal capture is unavailable, and switch back when sound resumes. Includes a live
+  source description, capture retries, and pause/resume handling when leaving the app.
 - Shader functions `get_fft_peak()`, `get_fft_peak_hz()`, `get_wave()`, `get_wave_left()` and
   `get_wave_right()`, alongside a BeatDrop-style clean FFT for `get_fft()` and `get_fft_hz()`.
 - Local system date/time and pointer inputs for shaders and preset equations. Touch input

@@ -139,12 +139,19 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
   - *Mic* — the microphone; works with any player and picks up the room.
   - *Internal* — what the phone plays through Android's `Visualizer` API, without a prompt.
     Apps that block capture come through silent.
+  - *Auto* — uses Internal when sound is available, falls back to the microphone after
+    about 1.2 seconds of silence, and returns to Internal after about 100 ms of sustained
+    sound. Brief pauses do not trigger a switch. The description shows the source in use.
+    Internal monitoring continues while the microphone is active, and unavailable capture
+    sources are retried. Blocked playback also triggers the microphone fallback.
 - **Audio sensitivity** — 0–10× input gain for the visuals; default 1.0×.
 - **FFT Shader Scaling** — 0–2; default 0.45.
 - **FFT Shader Noise Floor** — 0–1; default 0.10.
 
 The audio sliders apply immediately and are saved. Audio sensitivity affects the samples
 used for visualization, while FFT scaling and noise floor adjust shader FFT output.
+Auto requires microphone permission. It pauses capture while the app is in the background
+and resumes automatically when you return. Your selected audio mode is saved across launches.
 
 The app supports Android 9 (API 28) and newer on 32-bit and 64-bit ARM and x86 devices.
 

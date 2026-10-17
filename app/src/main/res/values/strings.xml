@@ -41,6 +41,11 @@
     <string name="setting_audio_source">Audio source</string>
     <string name="audio_source_mic">Mic</string>
     <string name="audio_source_internal">Internal</string>
+    <string name="audio_source_automatic">Auto</string>
+    <string name="audio_source_automatic_description">Uses Internal audio when available and the microphone during silence. Switches back when playback resumes.</string>
+    <string name="audio_source_automatic_internal">Auto is listening to audio playing on your device.</string>
+    <string name="audio_source_automatic_mic">Auto is using the microphone while Internal audio is silent or unavailable.</string>
+    <string name="audio_source_automatic_unavailable">Auto is waiting for audio input. Check microphone access or start playback.</string>
     <string name="audio_source_mic_description">Listens through your microphone, picking up music from speakers and sounds around you.</string>
     <string name="audio_source_internal_description">Listens to audio playing on your device. Some apps block capture, so their audio may not reach the visuals.</string>
     <string name="audio_source_internal_unavailable">Internal audio is unavailable on this device, so the mic is on.</string>

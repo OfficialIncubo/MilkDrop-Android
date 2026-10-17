@@ -7,4 +7,7 @@ enum class AudioInput {
 
     /** Captures the playing device's output mix through Android's Visualizer API. */
     INTERNAL,
+
+    /** Prefer captured playback, using the microphone while Internal is silent or unavailable. */
+    AUTOMATIC,
 }

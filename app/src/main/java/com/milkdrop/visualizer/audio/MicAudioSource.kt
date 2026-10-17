@@ -15,6 +15,9 @@ class MicAudioSource(
 
     private var captureThread: PcmCaptureThread? = null
 
+    override val isRunning: Boolean
+        get() = captureThread?.isRunning == true
+
     @SuppressLint("MissingPermission")
     override fun start() {
         val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE_HZ, CHANNEL_CONFIG, ENCODING)

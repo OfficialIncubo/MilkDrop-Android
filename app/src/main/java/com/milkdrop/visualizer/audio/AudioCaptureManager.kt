@@ -8,8 +8,22 @@ class AudioCaptureManager(
     private val context: Context,
     private val pcmSink: PcmSink,
 ) {
-    /** Both retained audio sources run in process. */
+    /** All capture sources run in process; Automatic owns its own monitoring worker. */
+    @Volatile
     private var localSource: AudioSource? = null
+
+    var onAutomaticSourceChanged: (() -> Unit)? = null
+
+    val automaticInput: AudioInput?
+        get() = (localSource as? AutomaticAudioSource)?.activeInput
+
+    fun startAutomatic(): Boolean = try {
+        startLocal(AutomaticAudioSource(context, pcmSink) { onAutomaticSourceChanged?.invoke() })
+        true
+    } catch (e: RuntimeException) {
+        Log.w(TAG, "Automatic audio unavailable", e)
+        false
+    }
 
     fun startMic(): Boolean =
         try {

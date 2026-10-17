@@ -16,6 +16,9 @@ class InternalAudioSource(private val sink: PcmSink) : AudioSource {
 
     private var capture: Capture? = null
 
+    override val isRunning: Boolean
+        get() = capture?.running?.get() == true
+
     /** Throws if the platform refuses (no output-mix access on this device, or it's in use). */
     override fun start() {
         if (capture != null) return
