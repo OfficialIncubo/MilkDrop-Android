@@ -8,6 +8,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 - Swipe right for the previous preset and left for the next while the UI is hidden.
 - Order audio source choices as Auto, Microphone, then Internal.
+- Keep Shuffle white when on and dimmed white when off, with a transparent background
+  and a white outline for remote focus.
 
 ## [2.0.0] - 2026-10-17
 

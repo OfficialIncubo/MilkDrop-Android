@@ -68,6 +68,7 @@
             <TextView
                 android:id="@+id/btnShuffle"
                 style="@style/ControlButton"
+                android:background="@drawable/shuffle_button_background"
                 app:drawableTopCompat="@drawable/ic_shuffle"
                 android:text="@string/btn_shuffle"
                 android:textColor="@color/toggle_content"
