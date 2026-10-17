@@ -35,6 +35,9 @@ limited by the device's capture size. Overlapping snapshots are analyzed as comp
 | `get_wave_left(position)` | Left waveform sample. |
 | `get_wave_right(position)` | Right waveform sample. |
 
+`HAS_FFT_PEAK` is defined as `1`. Presets can guard peak-specific code with
+`#if HAS_FFT_PEAK` or `#if defined(HAS_FFT_PEAK)`, including nested conditions and `#else` fallbacks.
+
 Positions clamp to 0–1. FFT positions span DC to the capture sample rate's Nyquist frequency
 (22,050 Hz for 44,100 Hz input). Hz lookups use the actual sample rate, including the rate
 reported by Android's Visualizer. Waveforms use 576 samples normalized around zero; audio

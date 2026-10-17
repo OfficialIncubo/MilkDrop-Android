@@ -319,6 +319,7 @@ static void PrefixPlainSamplerNames(std::string& program)
 )
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ScreenDependentRendering.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderConditionals.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderAudio.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderInputs.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/MotionVectors.cmake)

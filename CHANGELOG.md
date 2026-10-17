@@ -4,6 +4,11 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Fixed
+
+- Preset shader feature checks such as `#if HAS_FFT_PEAK` and
+  `#if defined(HAS_FFT_PEAK)` now evaluate correctly, including nested inactive branches.
+
 ### Added
 
 - Shader functions `get_fft_peak()`, `get_fft_peak_hz()`, `get_wave()`, `get_wave_left()` and
