@@ -6,6 +6,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Changed
 
+- Silence taps and swipe shortcuts on the visualization, while preserving normal UI sounds.
+- Make preset-list header focus move between Search, Favourites and Close with a remote;
+  retain search cursor movement while the on-screen keyboard is open.
 - Swipe right for the previous preset and left for the next while the UI is hidden.
 - Order audio source choices as Auto, Microphone, then Internal.
 - Keep Shuffle white when on and dimmed white when off, with a transparent background

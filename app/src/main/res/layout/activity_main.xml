@@ -161,6 +161,7 @@
 
             <ImageButton
                 android:id="@+id/btnCloseSettings"
+                android:nextFocusDown="@id/switchAutoAdvance"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:padding="12dp"
@@ -186,6 +187,7 @@
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchAutoAdvance"
+                    android:nextFocusUp="@id/btnCloseSettings"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:text="@string/setting_auto_advance"
@@ -418,6 +420,8 @@
 
             <EditText
                 android:id="@+id/playlistSearch"
+                android:nextFocusRight="@id/btnFavouritesOnly"
+                android:nextFocusDown="@id/playlistRecyclerView"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -430,6 +434,9 @@
             <!-- Shows only favourites when activated. -->
             <TextView
                 android:id="@+id/btnFavouritesOnly"
+                android:nextFocusLeft="@id/playlistSearch"
+                android:nextFocusRight="@id/btnClosePlaylist"
+                android:nextFocusDown="@id/playlistRecyclerView"
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
                 android:gravity="center_vertical"
@@ -446,6 +453,8 @@
 
             <Button
                 android:id="@+id/btnClosePlaylist"
+                android:nextFocusLeft="@id/btnFavouritesOnly"
+                android:nextFocusDown="@id/playlistRecyclerView"
                 style="?android:attr/buttonStyleSmall"
                 android:background="@drawable/remote_focus_background"
                 android:textColor="@color/overlay_content"

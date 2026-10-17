@@ -98,6 +98,8 @@ left selects the next, up opens the preset list, and down toggles shuffle with b
 are disabled while the control bar, Settings or preset list is visible. Sliders and the preset list keep their
 normal touch behavior. Short drags, diagonal drags and multi-touch gestures do not trigger
 shortcuts; touch input still reaches the preset shader pointer variables.
+Taps and swipes on the visualization are silent. Buttons, Settings and the preset list keep
+their normal interaction sounds, subject to the device's sound settings.
 The preset's name shows at the top while they're up, and for a couple of seconds on each change.
 
 - **Prev / Next** — step through presets. Prev goes back through the presets you actually saw,
@@ -173,6 +175,12 @@ Hold OK on the control bar to hide it. Settings, preset rows, favourite
 and hide buttons, and sliders are accessible with the D-pad. Left/right adjusts a focused
 slider. Back closes the current panel, then hides controls; another Back exits. Menu is an
 optional shortcut to Settings. Controls show a white outline when focused.
+
+In the preset list, Left/Right moves across Search, Favourites and Close when the keyboard is
+closed. Down enters the list, Up/Down browses presets, and OK selects a preset or activates
+a button. Select Search with OK to type; while the keyboard is open, arrows keep their normal
+editing behavior. In Settings, Up/Down moves between controls, Left/Right moves between
+options or adjusts a focused slider, and OK activates buttons and toggles.
 
 Android version alone does not determine graphics support. For example, an Android 9
 projector with a Mali-450 GPU reporting OpenGL ES 2.0 cannot run the current projectM renderer.

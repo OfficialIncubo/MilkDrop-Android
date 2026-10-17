@@ -564,6 +564,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun setupGestures() {
         surfaceView.isFocusable = false // Remote focus belongs to the overlay controls.
+        surfaceView.isSoundEffectsEnabled = false
         surfaceView.setOnClickListener {
             if (binding.settingsSheet.isVisible) closeSettingsSheet(showControls = false) else toggleControlBar()
         }
@@ -573,8 +574,8 @@ class MainActivity : AppCompatActivity() {
             },
             onSwipe = { swipe ->
                 when (swipe) {
-                    VisualizationTouchListener.Swipe.LEFT -> binding.btnNext.performClick()
-                    VisualizationTouchListener.Swipe.RIGHT -> binding.btnPrevious.performClick()
+                    VisualizationTouchListener.Swipe.LEFT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Next)
+                    VisualizationTouchListener.Swipe.RIGHT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Previous)
                     VisualizationTouchListener.Swipe.UP -> {
                         remoteNavigation = false
                         openPlaylistPanel()
@@ -586,9 +587,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleShuffleWithFeedback() {
-        binding.btnShuffle.performClick()
+        toggleShuffle()
         Toast.makeText(this, if (shuffleEnabled) R.string.shuffle_enabled else
             R.string.shuffle_disabled, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun toggleShuffle() {
+        shuffleEnabled = !shuffleEnabled
+        settings.shuffleEnabled = shuffleEnabled
+        updateShuffleButton()
+        surfaceView.milkDropRenderer.shuffleEnabled = shuffleEnabled
     }
 
     private fun setupControlBar() {
@@ -598,12 +606,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnPrevious.setOnClickListener {
             surfaceView.milkDropRenderer.requestNavigation(Navigation.Previous)
         }
-        binding.btnShuffle.setOnClickListener {
-            shuffleEnabled = !shuffleEnabled
-            settings.shuffleEnabled = shuffleEnabled
-            updateShuffleButton()
-            surfaceView.milkDropRenderer.shuffleEnabled = shuffleEnabled
-        }
+        binding.btnShuffle.setOnClickListener { toggleShuffle() }
         binding.btnPlaylist.setOnClickListener { openPlaylistPanel() }
         binding.btnSettings.setOnClickListener { openSettingsSheet() }
         binding.btnFavourite.setOnClickListener {
@@ -768,6 +771,16 @@ class MainActivity : AppCompatActivity() {
         }
         updateFavouritesOnlyButton()
         binding.playlistSearch.doAfterTextChanged { scheduleSearch() }
+        binding.playlistSearch.setOnKeyListener { _, key, event ->
+            val keyboardVisible = ViewCompat.getRootWindowInsets(binding.playlistSearch)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            if (remoteNavigation && !keyboardVisible && event.action == KeyEvent.ACTION_DOWN &&
+                (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                // EditText otherwise consumes these arrows for its cursor, trapping header focus.
+                if (key == KeyEvent.KEYCODE_DPAD_RIGHT) binding.btnFavouritesOnly.requestFocus()
+                true
+            } else false
+        }
     }
 
     private fun updateFavouritesOnlyButton() {
