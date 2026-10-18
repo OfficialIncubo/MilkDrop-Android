@@ -6,6 +6,9 @@
     <string name="cast_stop">Stop cast</string>
     <string name="cast_connecting">Connecting…</string>
     <string name="cast_choose_device">Cast to</string>
+    <string name="cast_wireless_settings">Wireless display / Miracast…</string>
+    <string name="cast_wireless_description">Open your phone’s connection settings to find Miracast or Smart View displays. After connecting, return to MilkDrop. Available options depend on your phone and TV.</string>
+    <string name="cast_wireless_unavailable">Wireless display settings aren’t available on this device.</string>
     <string name="cast_device">TV or projector</string>
     <string name="cast_you_are_casting">You are casting to</string>
     <string name="cast_control_message">Your visuals are playing on your TV or projector. Control presets and settings from this device. Tap here to show or hide the controls.</string>

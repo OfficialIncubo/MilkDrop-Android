@@ -6,6 +6,10 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Wireless display / Miracast shortcut in the Cast picker and Settings. Detect connected
+  presentation displays, including those paired in the phone's system picker, and restore
+  visual-only output on returning to MilkDrop without a TV app. Keep manual Stop respected
+  and unregister display listeners on pause. Firmware Miracast support is still required.
 - Direct MilkDrop Live receiving in the foreground TV app, discovered on the local network.
   Send H.264 frames with decoder feedback, bounded queues and key-frame recovery instead
   of a buffered video-player timeline. Restore local TV rendering/audio on disconnect.

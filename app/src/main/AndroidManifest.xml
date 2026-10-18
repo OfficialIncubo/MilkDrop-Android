@@ -21,6 +21,11 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <queries>
+        <intent><action android:name="android.settings.CAST_SETTINGS" /></intent>
+        <intent><action android:name="android.settings.WIRELESS_SETTINGS" /></intent>
+    </queries>
+
     <application
         android:name=".MilkDropApplication"
         android:allowBackup="false"

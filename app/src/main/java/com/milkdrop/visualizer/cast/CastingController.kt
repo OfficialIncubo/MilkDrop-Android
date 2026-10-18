@@ -2,6 +2,7 @@ package com.milkdrop.visualizer.cast
 
 import android.app.Presentation
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
@@ -14,6 +15,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
 import android.widget.ArrayAdapter
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -50,6 +52,8 @@ class CastingController(
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val router = MediaRouter.getInstance(context)
+    private val displays = context.getSystemService(DisplayManager::class.java)
+    private val suppressedDisplays = mutableSetOf<Int>()
     private val selector = MediaRouteSelector.Builder()
         .addControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO)
         .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
@@ -73,12 +77,29 @@ class CastingController(
     private sealed class Choice(val name: String) {
         class Direct(val device: DirectCastDevice, name: String) : Choice(name)
         class Route(val route: MediaRouter.RouteInfo) : Choice(route.name)
+        class Connected(val display: Display) : Choice(display.name)
+        class WirelessSettings(name: String) : Choice(name)
     }
     private var choices: List<Choice> = emptyList()
     private var directDevices: List<DirectCastDevice> = emptyList()
     private val directDiscovery = DirectCastDiscovery(context) { devices -> directDevices = devices; refresh() }
     private var directSender: DirectVideoSender? = null
     private val timeout = Runnable { if (connecting) fail(generation, IllegalStateException("Casting timed out")) }
+
+    private val displayEvents = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) { refresh(); adoptConnectedDisplay() }
+        override fun onDisplayChanged(displayId: Int) {
+            if (presentation?.display?.displayId == displayId && displays.getDisplay(displayId)?.isValid != true) {
+                stop(selectLocal = false, suppressDisplay = false)
+            }
+            refresh(); adoptConnectedDisplay()
+        }
+        override fun onDisplayRemoved(displayId: Int) {
+            suppressedDisplays.remove(displayId)
+            if (presentation?.display?.displayId == displayId) stop(selectLocal = false, suppressDisplay = false)
+            refresh()
+        }
+    }
 
     private val routes = object : MediaRouter.Callback() {
         override fun onRouteAdded(r: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
@@ -98,7 +119,11 @@ class CastingController(
         }
         override fun onRoutePresentationDisplayChanged(r: MediaRouter, route: MediaRouter.RouteInfo) {
             if (directSender == null && route.isSelected && device != null && CastDevice.getFromBundle(route.extras) == null) {
-                if (route.presentationDisplay == null && presentation != null) stop() else showPresentation(route)
+                val current = presentation?.display
+                if (route.presentationDisplay != null) showPresentation(route)
+                else if (current != null && displays.getDisplay(current.displayId)?.isValid != true) {
+                    stop(selectLocal = false, suppressDisplay = false)
+                }
             }
             refresh()
         }
@@ -151,16 +176,21 @@ class CastingController(
     fun start() {
         if (closed || started) return
         started = true
+        displays.registerDisplayListener(displayEvents, main)
         directDiscovery.start()
         discover(active = false)
         castContext?.sessionManager?.addSessionManagerListener(sessions, CastSession::class.java)
         refresh()
+        adoptConnectedDisplay()
     }
 
     fun pause() {
         if (!started) return
-        stop()
+        // Pairing/permissions may take the phone into system UI. Leave that system-owned
+        // wireless link intact so its presentation display can be adopted on return.
+        stop(selectLocal = false, suppressDisplay = false)
         started = false
+        displays.unregisterDisplayListener(displayEvents)
         directDiscovery.stop()
         chooser?.dismiss(); chooser = null
         router.removeCallback(routes)
@@ -180,6 +210,13 @@ class CastingController(
                         begin(choice.name)
                         router.selectRoute(choice.route)
                     }
+                    is Choice.Connected -> if (choice.display.isValid) {
+                        suppressedDisplays.remove(choice.display.displayId)
+                        begin(choice.name); showPresentation(choice.display)
+                    }
+                    is Choice.WirelessSettings -> if (!openWirelessDisplaySettings()) {
+                        Toast.makeText(context, R.string.cast_wireless_unavailable, Toast.LENGTH_LONG).show()
+                    }
                     null -> Unit
                 }
             }.setNegativeButton(android.R.string.cancel, null).create().also { dialog ->
@@ -190,6 +227,12 @@ class CastingController(
                 dialog.show()
             }
         discover(active = true)
+    }
+
+    fun openWirelessDisplaySettings(): Boolean {
+        val opened = WirelessDisplaySettings.open(context)
+        if (opened) suppressedDisplays.clear()
+        return opened
     }
 
     private fun discover(active: Boolean) {
@@ -213,21 +256,49 @@ class CastingController(
 
     private fun refresh() {
         if (closed) return
-        choices = directDevices.map { Choice.Direct(it, context.getString(R.string.cast_live_device, it.name)) } +
-            router.routes.filter(::compatible).map { Choice.Route(it) }
+        val routes = router.routes.filter(::compatible)
+        val routedDisplays = routes.mapNotNull { it.presentationDisplay?.displayId }.toSet()
+        val receivers = directDevices.map { Choice.Direct(it, context.getString(R.string.cast_live_device, it.name)) } +
+            routes.map { Choice.Route(it) } + connectedDisplays().filter { it.displayId !in routedDisplays }.map { Choice.Connected(it) }
+        choices = receivers + if (WirelessDisplaySettings.available(context))
+            listOf(Choice.WirelessSettings(context.getString(R.string.cast_wireless_settings))) else emptyList()
         chooserAdapter?.apply { clear(); addAll(choices.map { it.name }); notifyDataSetChanged() }
-        onState(State(started && choices.isNotEmpty(), device, connecting, casting))
+        // A settings shortcut isn't a discovered receiver: keep the floating button honest.
+        onState(State(started && receivers.isNotEmpty(), device, connecting, casting))
+    }
+
+    private fun connectedDisplays() = displays.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+        .filter { it.isValid && it.displayId != Display.DEFAULT_DISPLAY }
+
+    private fun adoptConnectedDisplay() {
+        if (!started || closed || device != null) return
+        val connected = connectedDisplays()
+        suppressedDisplays.retainAll(connected.map { it.displayId }.toSet())
+        val display = connected.firstOrNull { it.displayId !in suppressedDisplays } ?: return
+        begin(display.name); showPresentation(display)
     }
 
     private fun showPresentation(route: MediaRouter.RouteInfo) {
         val display = route.presentationDisplay ?: return
+        showPresentation(display)
+    }
+
+    private fun showPresentation(display: Display) {
         if (presentation?.display?.displayId == display.displayId) return
         if (presentation != null) { stop(); return }
         val id = generation
+        var outputSize: Pair<Int, Int>? = null
         try {
             presentation = ReceiverPresentation(context, display, { holder, w, h ->
                 if (id != generation || !started) return@ReceiverPresentation
-                if (output != null) return@ReceiverPresentation
+                if (output != null) {
+                    if (outputSize != (w to h)) {
+                        outputSize = w to h
+                        output?.resize(w, h); renderer.setCastSize(fitSize(w, h))
+                    }
+                    return@ReceiverPresentation
+                }
+                outputSize = w to h
                 val size = fitSize(w, h)
                 val destination = VisualOutput(holder.surface, w, h, false, { error ->
                     main.post { fail(id, error) }
@@ -327,7 +398,7 @@ class CastingController(
         if (old != null) cleanup(old, null, null)
     }
 
-    fun stop(selectLocal: Boolean = true) {
+    fun stop(selectLocal: Boolean = true, suppressDisplay: Boolean = true) {
         generation++
         main.removeCallbacks(timeout)
         val oldOutput = output; val oldEncoder = encoder; val oldServer = server
@@ -337,6 +408,7 @@ class CastingController(
         mediaClient?.unregisterCallback(mediaEvents); mediaClient = null
         val hadSession = session != null; session = null
         val oldPresentation = presentation; presentation = null
+        if (suppressDisplay && oldPresentation != null) suppressedDisplays.add(oldPresentation.display.displayId)
         device = null; connecting = false; casting = false
         cleanup(oldOutput, oldEncoder, oldServer)
         oldPresentation?.dismiss()

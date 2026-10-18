@@ -466,6 +466,30 @@
                     android:layout_height="48dp"
                     android:max="100" />
 
+                <TextView
+                    android:id="@+id/btnWirelessDisplay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:minHeight="48dp"
+                    android:padding="12dp"
+                    android:gravity="center_vertical"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:background="@drawable/remote_focus_background"
+                    android:text="@string/cast_wireless_settings"
+                    android:textColor="@color/overlay_content"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/wirelessDisplayDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/cast_wireless_description"
+                    android:textColor="@color/overlay_content_secondary"
+                    android:textSize="13sp" />
+
             </LinearLayout>
 
         </ScrollView>

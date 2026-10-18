@@ -13,8 +13,8 @@ import java.io.Closeable
 /** Copies only projectM's completed framebuffer to a display or video encoder surface. */
 class VisualOutput(
     private val surface: Surface,
-    private val width: Int,
-    private val height: Int,
+    width: Int,
+    height: Int,
     private val encoded: Boolean,
     private val onError: (Exception) -> Unit,
     private val onStarted: () -> Unit = {},
@@ -33,9 +33,15 @@ class VisualOutput(
     private var started = false
     private var displayInitialized = false
     private var consumerFence = 0L
+    @Volatile private var dimensions = width to height
+
+    fun resize(width: Int, height: Int) {
+        if (width > 0 && height > 0) dimensions = width to height
+    }
 
     /** Called on the existing render thread. Neither UI views nor audio enter this copy. */
     @Synchronized fun draw(w: Int, h: Int) {
+        val (width, height) = dimensions
         val now = System.nanoTime()
         if (closed || now + 2_000_000 < nextFrame || w <= 0 || h <= 0) return
         val interval = 1_000_000_000L / 30

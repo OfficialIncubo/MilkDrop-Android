@@ -46,6 +46,7 @@ import com.milkdrop.visualizer.audio.AudioCaptureManager
 import com.milkdrop.visualizer.audio.AudioInput
 import com.milkdrop.visualizer.cast.CastingController
 import com.milkdrop.visualizer.cast.DirectCastReceiver
+import com.milkdrop.visualizer.cast.WirelessDisplaySettings
 import com.milkdrop.visualizer.databinding.ActivityMainBinding
 import com.milkdrop.visualizer.presets.PresetListCache
 import com.milkdrop.visualizer.presets.PresetPaths
@@ -768,6 +769,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettingsSheet() {
+        binding.btnWirelessDisplay.isVisible = WirelessDisplaySettings.available(this)
+        binding.wirelessDisplayDescription.isVisible = binding.btnWirelessDisplay.isVisible
+        binding.btnWirelessDisplay.setOnClickListener {
+            if (!(castingController?.openWirelessDisplaySettings() ?: WirelessDisplaySettings.open(this))) {
+                Toast.makeText(this, R.string.cast_wireless_unavailable, Toast.LENGTH_LONG).show()
+            }
+        }
         listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchPresetNameDuringTransitions,
             binding.switchScreenDependentRendering,
             binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {

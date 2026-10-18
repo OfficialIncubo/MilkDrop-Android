@@ -154,12 +154,20 @@ The button hides while Settings or the preset list is open and shows a spinner w
   stream; receiver buffering adds several seconds of delay. Guest networks that isolate
   devices can prevent playback.
 - **Miracast / Wireless Display and external displays:** supported when Android exposes the
-  display as a video route. Some phones require Wireless Display to be enabled in system
-  settings; not every phone or TV supports this protocol. These routes use an Android
-  presentation rather than the Google Cast video stream.
+  display as a video route or connected presentation display. Use **Wireless display / Miracast…**
+  in the Cast picker or MilkDrop Settings to open the phone's system picker (or connection
+  settings if a dedicated picker is unavailable). Connect there and return to MilkDrop;
+  it automatically uses a supported connected display for visuals. Samsung TVs seen in
+  Smart View may appear only in that system picker until connected. This requires no
+  MilkDrop installation on the TV. The phone's firmware and TV must support Miracast;
+  the app cannot add that protocol to a phone that lacks it. If the system only offers
+  whole-screen mirroring without a presentation display, it mirrors the phone's UI too.
+  Stop cast ends MilkDrop's presentation; use system connection settings to disconnect
+  mirroring if the phone keeps that connection active.
 
-Casting sends no audio and does not capture the sidebar or other apps. Existing audio modes
-keep feeding projectM. Casting runs only while MilkDrop is in the foreground and stops on
+MilkDrop streams its visual framebuffer; its network video streams carry no audio or app UI.
+Android manages audio routing and whole-screen mirroring for system wireless displays.
+Existing audio modes keep feeding projectM. Casting runs only while MilkDrop is in the foreground and stops on
 app pause, disconnection or failure; the phone then resumes local visuals. Network video
 encoding is capped at 960×544 at 30 fps, with a 640×368 fallback, to limit work on older
 devices. Android 9 remains the minimum supported version. Device discovery and playback
