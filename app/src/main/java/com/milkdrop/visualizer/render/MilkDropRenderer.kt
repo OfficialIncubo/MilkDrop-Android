@@ -3,6 +3,7 @@ package com.milkdrop.visualizer.render
 import android.opengl.GLSurfaceView
 import android.os.SystemClock
 import android.util.Log
+import com.milkdrop.visualizer.cast.VisualOutput
 import com.milkdrop.visualizer.settings.AudioTuning
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -41,6 +42,10 @@ class MilkDropRenderer(
     }
 
     private val pendingCountdownRestart = AtomicBoolean(false)
+
+    @Volatile var visualOutput: VisualOutput? = null
+    private var viewportWidth = 0
+    private var viewportHeight = 0
 
     @Volatile
     var handle: Long = 0L
@@ -244,6 +249,7 @@ class MilkDropRenderer(
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width; viewportHeight = height
         if (handle != 0L) ProjectMBridge.nativeSetWindowSize(handle, width, height)
     }
 
@@ -255,6 +261,7 @@ class MilkDropRenderer(
         applyPendingState()
         reportFrameRate(frameStartNanos)
         ProjectMBridge.nativeRenderFrame(handle)
+        visualOutput?.draw(viewportWidth, viewportHeight)
         reportPresetChange()
         performanceHints.onFrameEnd(System.nanoTime())
     }

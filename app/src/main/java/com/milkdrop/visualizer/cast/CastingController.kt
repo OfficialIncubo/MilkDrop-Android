@@ -1,0 +1,368 @@
+package com.milkdrop.visualizer.cast
+
+import android.app.Presentation
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.Display
+import android.view.SurfaceHolder
+import android.view.SurfaceView
+import android.view.WindowManager
+import android.widget.ArrayAdapter
+import androidx.appcompat.app.AlertDialog
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.mediarouter.media.MediaControlIntent
+import androidx.mediarouter.media.MediaRouteSelector
+import androidx.mediarouter.media.MediaRouter
+import com.google.android.gms.cast.CastDevice
+import com.google.android.gms.cast.CastMediaControlIntent
+import com.google.android.gms.cast.MediaInfo
+import com.google.android.gms.cast.MediaLoadRequestData
+import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaStatus
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
+import com.milkdrop.visualizer.R
+import com.milkdrop.visualizer.render.MilkDropSurfaceView
+import java.io.Closeable
+import java.net.Inet4Address
+import java.util.concurrent.Executors
+
+/** One foreground-only cast session. All session/UI mutations run on the main thread. */
+class CastingController(
+    private val context: Context,
+    private val renderer: MilkDropSurfaceView,
+    private val onState: (State) -> Unit,
+    private val onError: () -> Unit,
+) : Closeable {
+    data class State(val available: Boolean, val device: String? = null,
+        val connecting: Boolean = false, val casting: Boolean = false)
+
+    private val main = Handler(Looper.getMainLooper())
+    private val worker = Executors.newSingleThreadExecutor()
+    private val router = MediaRouter.getInstance(context)
+    private val selector = MediaRouteSelector.Builder()
+        .addControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO)
+        .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
+        .build()
+    private var castContext: CastContext? = null
+    private var started = false
+    private var closed = false
+    private var generation = 0
+    private var device: String? = null
+    private var connecting = false
+    private var casting = false
+    private var output: VisualOutput? = null
+    private var presentation: ReceiverPresentation? = null
+    private var encoder: VisualStreamEncoder? = null
+    private var server: LiveStreamServer? = null
+    private var streamStarting = false
+    private var session: CastSession? = null
+    private var mediaClient: RemoteMediaClient? = null
+    private var chooser: AlertDialog? = null
+    private var chooserAdapter: ArrayAdapter<String>? = null
+    private var choices: List<MediaRouter.RouteInfo> = emptyList()
+    private val timeout = Runnable { if (connecting) fail(generation, IllegalStateException("Casting timed out")) }
+
+    private val routes = object : MediaRouter.Callback() {
+        override fun onRouteAdded(r: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
+        override fun onRouteRemoved(r: MediaRouter, route: MediaRouter.RouteInfo) {
+            if (device != null && route.isSelected) stop() else refresh()
+        }
+        override fun onRouteChanged(r: MediaRouter, route: MediaRouter.RouteInfo) {
+            if (device != null && route.isSelected && !route.isEnabled) stop() else refresh()
+        }
+        override fun onRouteSelected(r: MediaRouter, route: MediaRouter.RouteInfo) {
+            if (!started || route.isDefault || route.isBluetooth) return
+            if (device == null) begin(route.name)
+            if (CastDevice.getFromBundle(route.extras) == null) showPresentation(route)
+        }
+        override fun onRouteUnselected(r: MediaRouter, route: MediaRouter.RouteInfo) {
+            if (!route.isDefault && device != null) stop(selectLocal = false)
+        }
+        override fun onRoutePresentationDisplayChanged(r: MediaRouter, route: MediaRouter.RouteInfo) {
+            if (route.isSelected && device != null && CastDevice.getFromBundle(route.extras) == null) {
+                if (route.presentationDisplay == null && presentation != null) stop() else showPresentation(route)
+            }
+            refresh()
+        }
+    }
+
+    private val mediaEvents = object : RemoteMediaClient.Callback() {
+        override fun onStatusUpdated() {
+            val client = mediaClient ?: return
+            when (client.playerState) {
+                MediaStatus.PLAYER_STATE_PLAYING -> {
+                    connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
+                }
+                MediaStatus.PLAYER_STATE_IDLE -> if (casting || client.idleReason == MediaStatus.IDLE_REASON_ERROR) {
+                    if (client.idleReason == MediaStatus.IDLE_REASON_ERROR) fail(generation, IllegalStateException("Receiver playback failed"))
+                    else stop()
+                }
+            }
+        }
+    }
+
+    private val sessions = object : SessionManagerListener<CastSession> {
+        override fun onSessionStarted(s: CastSession, id: String) = startGoogleStream(s)
+        override fun onSessionResumed(s: CastSession, suspended: Boolean) = startGoogleStream(s)
+        override fun onSessionEnded(s: CastSession, error: Int) { if (session === s) stop(selectLocal = false) }
+        override fun onSessionStartFailed(s: CastSession, error: Int) = fail(generation, IllegalStateException("Cast connection failed: $error"))
+        override fun onSessionResumeFailed(s: CastSession, error: Int) = fail(generation, IllegalStateException("Cast resume failed: $error"))
+        override fun onSessionSuspended(s: CastSession, reason: Int) { if (session === s) stop() }
+        override fun onSessionStarting(s: CastSession) = Unit
+        override fun onSessionEnding(s: CastSession) = Unit
+        override fun onSessionResuming(s: CastSession, id: String) = Unit
+    }
+
+    init {
+        // Play Services is optional: initialization failure must not affect local/Miracast rendering.
+        try {
+            CastContext.getSharedInstance(context, worker).addOnSuccessListener { value ->
+                if (!closed) {
+                    castContext = value
+                    if (started) value.sessionManager.addSessionManagerListener(sessions, CastSession::class.java)
+                    refresh()
+                }
+            }.addOnFailureListener { Log.i(TAG, "Google Cast unavailable on this device", it) }
+        } catch (e: Exception) { Log.i(TAG, "Google Cast unavailable on this device", e) }
+    }
+
+    fun start() {
+        if (closed || started) return
+        started = true
+        discover(active = false)
+        castContext?.sessionManager?.addSessionManagerListener(sessions, CastSession::class.java)
+        refresh()
+    }
+
+    fun pause() {
+        if (!started) return
+        stop()
+        started = false
+        chooser?.dismiss(); chooser = null
+        router.removeCallback(routes)
+        castContext?.sessionManager?.removeSessionManagerListener(sessions, CastSession::class.java)
+    }
+
+    fun chooseOrStop() {
+        if (device != null) { stop(); return }
+        refresh()
+        if (choices.isEmpty()) return
+        chooserAdapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, choices.map { it.name })
+        chooser = AlertDialog.Builder(context).setTitle(R.string.cast_choose_device)
+            .setAdapter(chooserAdapter) { _, index ->
+                choices.getOrNull(index)?.takeIf { it.isEnabled }?.let { route ->
+                    begin(route.name)
+                    router.selectRoute(route)
+                }
+            }.setNegativeButton(android.R.string.cancel, null).create().also { dialog ->
+                dialog.setOnDismissListener {
+                    chooser = null; chooserAdapter = null
+                    if (started) discover(active = false)
+                }
+                dialog.show()
+            }
+        discover(active = true)
+    }
+
+    private fun discover(active: Boolean) {
+        router.removeCallback(routes)
+        if (started) router.addCallback(selector, routes, if (active)
+            MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN else MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
+    }
+
+    private fun begin(name: String) {
+        device = name; connecting = true; casting = false
+        main.removeCallbacks(timeout); main.postDelayed(timeout, 25_000)
+        refresh()
+    }
+
+    private fun compatible(route: MediaRouter.RouteInfo): Boolean {
+        if (!route.isEnabled || route.isDefault || route.isBluetooth) return false
+        val cast = CastDevice.getFromBundle(route.extras)
+        return if (cast != null) castContext != null && cast.hasCapability(CastDevice.CAPABILITY_VIDEO_OUT)
+        else route.supportsControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO) || route.presentationDisplay != null
+    }
+
+    private fun refresh() {
+        if (closed) return
+        choices = router.routes.filter(::compatible)
+        chooserAdapter?.apply { clear(); addAll(choices.map { it.name }); notifyDataSetChanged() }
+        onState(State(started && choices.isNotEmpty(), device, connecting, casting))
+    }
+
+    private fun showPresentation(route: MediaRouter.RouteInfo) {
+        val display = route.presentationDisplay ?: return
+        if (presentation?.display?.displayId == display.displayId) return
+        if (presentation != null) { stop(); return }
+        val id = generation
+        try {
+            presentation = ReceiverPresentation(context, display, { holder, w, h ->
+                if (id != generation || !started) return@ReceiverPresentation
+                if (output != null) return@ReceiverPresentation
+                val size = fitSize(w, h)
+                val destination = VisualOutput(holder.surface, w, h, false, { error ->
+                    main.post { fail(id, error) }
+                }, onStarted = {
+                    main.post { if (id == generation && device != null) {
+                        connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
+                    } }
+                })
+                installOutput(destination, size)
+            }, { main.post { if (id == generation && device != null) stop() } }).also { it.show() }
+        } catch (e: WindowManager.InvalidDisplayException) { fail(id, e) }
+    }
+
+    private fun startGoogleStream(s: CastSession) {
+        if (!started || closed || streamStarting || session === s) return
+        if (device == null) { castContext?.sessionManager?.endCurrentSession(true); return }
+        session = s; streamStarting = true
+        val id = generation
+        worker.execute {
+            var pendingServer: LiveStreamServer? = null
+            var pendingEncoder: VisualStreamEncoder? = null
+            try {
+                val address = lanAddress()
+                pendingServer = LiveStreamServer()
+                val stream = pendingServer
+                pendingEncoder = VisualStreamEncoder(stream, onReady = {
+                    main.post { if (id == generation && session === s && started) loadStream(s, stream.url(address), id) }
+                }, onError = { error -> main.post { fail(id, error) } })
+                val video = pendingEncoder
+                main.post {
+                    if (id != generation || !started || closed) {
+                        cleanup(null, video, stream)
+                    } else {
+                        encoder = video; server = stream; streamStarting = false
+                        installOutput(VisualOutput(video.surface, video.width, video.height, true,
+                            { error -> main.post { fail(id, error) } }), video.width to video.height)
+                    }
+                }
+            } catch (e: Exception) {
+                pendingEncoder?.close(); pendingServer?.close()
+                main.post { fail(id, e) }
+            }
+        }
+    }
+
+    private fun loadStream(s: CastSession, url: String, id: Int) {
+        val client = s.remoteMediaClient ?: return fail(id, IllegalStateException("No receiver player"))
+        mediaClient = client; client.registerCallback(mediaEvents)
+        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
+            putString(MediaMetadata.KEY_TITLE, context.getString(R.string.app_name))
+        }
+        val info = MediaInfo.Builder(url).setContentType("application/x-mpegURL")
+            .setStreamType(MediaInfo.STREAM_TYPE_LIVE).setMetadata(metadata).build()
+        client.load(MediaLoadRequestData.Builder().setMediaInfo(info).setAutoplay(true).build())
+            .setResultCallback { result ->
+                if (!result.status.isSuccess) fail(id, IllegalStateException("Receiver rejected stream: ${result.status.statusCode}"))
+            }
+    }
+
+    private fun installOutput(destination: VisualOutput, size: Pair<Int, Int>) {
+        val old = output
+        output = destination; renderer.milkDropRenderer.visualOutput = destination
+        renderer.setCastSize(size)
+        if (old != null) cleanup(old, null, null)
+    }
+
+    fun stop(selectLocal: Boolean = true) {
+        generation++
+        main.removeCallbacks(timeout)
+        val oldOutput = output; val oldEncoder = encoder; val oldServer = server
+        renderer.milkDropRenderer.visualOutput = null; renderer.setCastSize(null)
+        output = null; encoder = null; server = null; streamStarting = false
+        mediaClient?.unregisterCallback(mediaEvents); mediaClient = null
+        val hadSession = session != null; session = null
+        val oldPresentation = presentation; presentation = null
+        device = null; connecting = false; casting = false
+        cleanup(oldOutput, oldEncoder, oldServer)
+        oldPresentation?.dismiss()
+        if (hadSession) castContext?.sessionManager?.endCurrentSession(true)
+        if (selectLocal && !router.selectedRoute.isDefault) router.selectRoute(router.defaultRoute)
+        refresh()
+    }
+
+    private fun fail(id: Int, error: Exception) {
+        if (id != generation || closed || device == null) return
+        Log.w(TAG, "Casting stopped", error)
+        stop(); onError()
+    }
+
+    private fun cleanup(destination: VisualOutput?, video: VisualStreamEncoder?, stream: LiveStreamServer?) {
+        if (destination == null && video == null && stream == null) return
+        val release = Runnable {
+            runCatching { destination?.close() }
+            runCatching { video?.close() }
+            runCatching { stream?.close() }
+        }
+        try { worker.execute(release) } catch (_: java.util.concurrent.RejectedExecutionException) {
+            Thread(release, "MilkDrop-cast-cleanup").apply { isDaemon = true; start() }
+        }
+    }
+
+    @Suppress("DEPRECATION") // API 28 needs the existing LAN networks, not only the internet default.
+    private fun lanAddress(): String {
+        val connectivity = context.getSystemService(ConnectivityManager::class.java)
+        for (network in (listOfNotNull(connectivity.activeNetwork) + connectivity.allNetworks).distinct()) {
+            val capabilities = connectivity.getNetworkCapabilities(network) ?: continue
+            if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) continue
+            val ip = connectivity.getLinkProperties(network)?.linkAddresses?.firstOrNull {
+                it.address is Inet4Address && !it.address.isLoopbackAddress && !it.address.isLinkLocalAddress
+            }?.address?.hostAddress
+            if (ip != null) return ip
+        }
+        error("No local Wi-Fi or Ethernet address")
+    }
+
+    override fun close() {
+        if (closed) return
+        pause(); closed = true
+        main.removeCallbacksAndMessages(null)
+        worker.shutdown() // Drain resource cleanup already queued; never interrupt codec release.
+    }
+
+    private class ReceiverPresentation(context: Context, display: Display,
+        val onSurface: (SurfaceHolder, Int, Int) -> Unit, val onLost: () -> Unit,
+    ) : Presentation(context, display) {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window?.let { receiverWindow ->
+                WindowCompat.setDecorFitsSystemWindows(receiverWindow, false)
+                WindowCompat.getInsetsController(receiverWindow, receiverWindow.decorView).apply {
+                    hide(WindowInsetsCompat.Type.systemBars())
+                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+            setContentView(SurfaceView(context).apply {
+                holder.addCallback(object : SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: SurfaceHolder) = Unit
+                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                        if (width > 0 && height > 0) onSurface(holder, width, height)
+                    }
+                    override fun surfaceDestroyed(holder: SurfaceHolder) = onLost()
+                })
+            })
+            setOnDismissListener { onLost() }
+        }
+    }
+
+    private companion object {
+        const val TAG = "MilkDropCast"
+        fun fitSize(w: Int, h: Int): Pair<Int, Int> {
+            val scale = minOf(1f, 1280f / w, 720f / h)
+            return (w * scale).toInt().coerceAtLeast(2) to (h * scale).toInt().coerceAtLeast(2)
+        }
+    }
+}

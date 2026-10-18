@@ -6,6 +6,10 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Foreground visual casting to Google Cast video receivers and Android-exposed external
+  display/Miracast routes. Show a rounded Cast/Stop cast button as receivers appear, keep
+  controls on the phone, and return visuals locally when casting stops. Use bounded stream
+  buffers, encoder fallback and lifecycle cleanup while retaining Android 9 support.
 - Saved Preset name during transitions toggle after Change on big beats, enabled by default.
   Disable the preset-change name popup while keeping the name available in the sidebar.
 - Match search words in any order, ignoring case and extra whitespace, and show result

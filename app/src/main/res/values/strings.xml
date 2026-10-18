@@ -1,4 +1,12 @@
 <resources>
+    <string name="cast_start">Cast</string>
+    <string name="cast_stop">Stop cast</string>
+    <string name="cast_connecting">Connecting…</string>
+    <string name="cast_choose_device">Cast to</string>
+    <string name="cast_device">TV or projector</string>
+    <string name="cast_you_are_casting">You are casting to</string>
+    <string name="cast_control_message">Your visuals are playing on your TV or projector. Control presets and settings from this device. Tap here to show or hide the controls.</string>
+    <string name="cast_failed">Couldn’t cast to this device. Check the connection and try again.</string>
     <string name="shuffle_enabled">Shuffle on</string>
     <string name="shuffle_disabled">Shuffle off</string>
     <string name="graphics_unsupported_title">Graphics support required</string>

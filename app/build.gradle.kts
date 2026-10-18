@@ -66,6 +66,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.mediarouter:mediarouter:1.8.1")
+    implementation("com.google.android.gms:play-services-cast-framework:22.1.0")
 
     testImplementation("junit:junit:4.13.2")
 }

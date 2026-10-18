@@ -14,6 +14,47 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- The renderer keeps running beneath this View; its framebuffer alone goes to the TV. -->
+    <LinearLayout
+        android:id="@+id/castStatus"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/cast_you_are_casting" android:textColor="@color/overlay_content_secondary"
+            android:textSize="18sp" android:gravity="center" />
+        <TextView android:id="@+id/castDeviceName" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:layout_marginTop="8dp"
+            android:textColor="@color/overlay_content" android:textSize="28sp" android:gravity="center"
+            android:maxLines="2" android:ellipsize="end" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:maxWidth="440dp" android:gravity="center"
+            android:text="@string/cast_control_message" android:textColor="@color/overlay_content_secondary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/btnCast"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:paddingHorizontal="16dp"
+        android:drawablePadding="8dp"
+        android:gravity="center"
+        android:background="@drawable/cast_button_background"
+        android:focusable="true"
+        android:clickable="true"
+        android:text="@string/cast_start"
+        android:textColor="@color/overlay_content"
+        android:textSize="16sp"
+        android:visibility="gone"
+        app:drawableStartCompat="@drawable/ic_cast" />
+
     <!-- Plain shadowed text rather than a badge or panel, so it doesn't box off part of the visual.
          Shows the current preset's name, or a status message while presets load. -->
     <TextView

@@ -132,6 +132,30 @@ enabled, it also appears for a couple of seconds on each preset change.
 
 The app follows the phone's rotation; in landscape the controls are a single row.
 
+### Casting visuals
+
+A rounded **Cast** button appears at the upper right when a compatible display is discovered.
+Choose a TV or projector to send only the visuals. The phone shows the receiver's name and
+keeps preset controls, swipe gestures, the list and Settings available. **Stop cast** restores
+the visuals to the phone without restarting the preset.
+
+- **Google Cast / Chromecast / Google TV:** requires Google Play services and a receiver on
+  the same reachable Wi-Fi or Ethernet network. The phone serves a session-only H.264 live
+  stream; receiver buffering adds several seconds of delay. Guest networks that isolate
+  devices can prevent playback.
+- **Miracast / Wireless Display and external displays:** supported when Android exposes the
+  display as a video route. Some phones require Wireless Display to be enabled in system
+  settings; not every phone or TV supports this protocol. These routes use an Android
+  presentation rather than the Google Cast video stream.
+
+Casting sends no audio and does not capture the sidebar or other apps. Existing audio modes
+keep feeding projectM. Casting runs only while MilkDrop is in the foreground and stops on
+app pause, disconnection or failure; the phone then resumes local visuals. Google Cast
+encoding is capped at 960×544 at 30 fps, with a 640×368 fallback, to limit work on older
+devices. Android 9 remains the minimum supported version. Device discovery and playback
+still need verification on physical receivers; a compatible receiver must advertise a route
+before the Cast button can appear.
+
 Preset names, favourites, and the resume preset follow the filename confirmed by a successful
 projectM load. If projectM skips and removes a failed preset from its internal playlist, later
 names and list selections still refer to the correct files. Tap a skipped preset in the list

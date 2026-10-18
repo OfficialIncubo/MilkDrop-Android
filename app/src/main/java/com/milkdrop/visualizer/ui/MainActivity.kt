@@ -43,6 +43,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.milkdrop.visualizer.R
 import com.milkdrop.visualizer.audio.AudioCaptureManager
 import com.milkdrop.visualizer.audio.AudioInput
+import com.milkdrop.visualizer.cast.CastingController
 import com.milkdrop.visualizer.databinding.ActivityMainBinding
 import com.milkdrop.visualizer.presets.PresetListCache
 import com.milkdrop.visualizer.presets.PresetPaths
@@ -67,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var audioCaptureManager: AudioCaptureManager
     private lateinit var presetAdapter: PresetListAdapter
     private lateinit var settings: AppSettings
+    private var castingController: CastingController? = null
 
     private var autoAdvanceEnabled = true
     private var shuffleEnabled = true
@@ -196,6 +198,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupGestures()
+        castingController = CastingController(this, surfaceView, onState = { state ->
+            val showCast = state.available || state.device != null
+            if (binding.btnCast.isVisible != showCast) {
+                binding.btnCast.isVisible = showCast
+                ViewCompat.requestApplyInsets(binding.root)
+            }
+            binding.btnCast.setText(when {
+                state.connecting -> R.string.cast_connecting
+                state.device != null -> R.string.cast_stop
+                else -> R.string.cast_start
+            })
+            binding.btnCast.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                if (state.device != null) R.drawable.ic_cast_off else R.drawable.ic_cast, 0, 0, 0)
+            binding.castStatus.isVisible = state.casting
+            binding.castDeviceName.text = state.device
+        }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() })
+        binding.btnCast.setOnClickListener { castingController?.chooseOrStop() }
         setupControlBar()
         setupSettingsSheet()
         setupPlaylistPanel()
@@ -401,6 +420,7 @@ class MainActivity : AppCompatActivity() {
         val sheetPadding = Padding.of(binding.settingsSheet)
         val panelPadding = Padding.of(binding.playlistPanel)
         val statusTopMargin = (binding.presetStatus.layoutParams as ViewGroup.MarginLayoutParams).topMargin
+        val castMargin = (binding.btnCast.layoutParams as ViewGroup.MarginLayoutParams).topMargin
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val bars = insets.getInsetsIgnoringVisibility(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
@@ -418,7 +438,13 @@ class MainActivity : AppCompatActivity() {
                 right = panelPadding.right + bars.right, bottom = panelPadding.bottom + bars.bottom,
             )
             binding.presetStatus.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                topMargin = statusTopMargin + bars.top + (STATUS_TOP_GAP_DP * resources.displayMetrics.density).toInt()
+                val castGap = if (binding.btnCast.isVisible) 56 else 0
+                topMargin = statusTopMargin + bars.top +
+                    ((STATUS_TOP_GAP_DP + castGap) * resources.displayMetrics.density).toInt()
+            }
+            binding.btnCast.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = castMargin + bars.top
+                marginEnd = castMargin + if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) bars.left else bars.right
             }
             insets
         }
@@ -470,6 +496,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (graphicsBlocked) return
         surfaceView.onResume()
+        castingController?.start()
         if (resumeAutomaticAudio) {
             resumeAutomaticAudio = false
             if (settings.audioInput == AudioInput.AUTOMATIC) startPersistedAudioSource()
@@ -548,6 +575,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (graphicsBlocked) return
+        castingController?.pause()
         consumedRemoteKeys.clear()
         if (settings.audioInput == AudioInput.AUTOMATIC) {
             resumeAutomaticAudio = true
@@ -559,6 +587,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        castingController?.close()
+        castingController = null
         super.onDestroy()
         searchGeneration++
         if (::audioCaptureManager.isInitialized) {
@@ -591,22 +621,25 @@ class MainActivity : AppCompatActivity() {
         surfaceView.setOnClickListener {
             if (binding.settingsSheet.isVisible) closeSettingsSheet(showControls = false) else toggleControlBar()
         }
-        surfaceView.setOnTouchListener(VisualizationTouchListener(this,
-            canSwipe = {
-                !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible
-            },
-            onSwipe = { swipe ->
-                when (swipe) {
-                    VisualizationTouchListener.Swipe.LEFT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Next)
-                    VisualizationTouchListener.Swipe.RIGHT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Previous)
-                    VisualizationTouchListener.Swipe.UP -> {
-                        remoteNavigation = false
-                        openPlaylistPanel(restoreControls = false)
+        for (target in listOf<View>(surfaceView, binding.castStatus)) {
+            target.isFocusable = false
+            target.isSoundEffectsEnabled = false
+            if (target !== surfaceView) target.setOnClickListener { surfaceView.performClick() }
+            target.setOnTouchListener(VisualizationTouchListener(this,
+                canSwipe = { !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible },
+                onSwipe = { swipe ->
+                    when (swipe) {
+                        VisualizationTouchListener.Swipe.LEFT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Next)
+                        VisualizationTouchListener.Swipe.RIGHT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Previous)
+                        VisualizationTouchListener.Swipe.UP -> {
+                            remoteNavigation = false
+                            openPlaylistPanel(restoreControls = false)
+                        }
+                        VisualizationTouchListener.Swipe.DOWN -> toggleShuffleWithFeedback()
                     }
-                    VisualizationTouchListener.Swipe.DOWN -> toggleShuffleWithFeedback()
-                }
-            },
-        ))
+                },
+            ))
+        }
     }
 
     private fun toggleShuffleWithFeedback() {
