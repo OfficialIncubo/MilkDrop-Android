@@ -11,9 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Surface-input AVC encoding; never reads the screen or captures the app's controls/audio. */
 internal class VisualStreamEncoder(
-    private val server: LiveStreamServer,
+    private val server: LiveStreamServer? = null,
     private val onReady: () -> Unit,
     private val onError: (Exception) -> Unit,
+    private val direct: DirectVideoSender? = null,
 ) : Closeable {
     val width: Int
     val height: Int
@@ -21,6 +22,7 @@ internal class VisualStreamEncoder(
     val surface: Surface
     private val running = AtomicBoolean(true)
     private val drainThread: Thread
+    private val syncRequested = AtomicBoolean(false)
 
     init {
         var selected: MediaCodec? = null
@@ -52,32 +54,38 @@ internal class VisualStreamEncoder(
         codec = selected ?: throw IllegalStateException("No compatible AVC surface encoder", failure)
         surface = checkNotNull(selectedSurface)
         width = size.first; height = size.second
+        direct?.requestKeyFrame = { syncRequested.set(true) }
         drainThread = Thread(::drain, "MilkDrop-cast-encoder").apply { isDaemon = true; start() }
     }
 
     private fun drain() {
         val info = MediaCodec.BufferInfo()
         val muxer = TransportStream()
-        var headers = ByteArray(0)
+        val headers = AvcHeaders()
         var segmentStart = -1L
         var firstTimestamp = -1L
         var previousTime = -1L
         var discontinuity = false
         var nextDiscontinuity = false
         var ready = false
+        var lastKeyRequest = 0L
         fun publish(duration: Double) {
-            val available = server.publish(muxer.bytes(), duration.coerceAtLeast(0.001), discontinuity)
+            val available = server?.publish(muxer.bytes(), duration.coerceAtLeast(0.001), discontinuity) == true
             if (available && !ready) { ready = true; onReady() }
         }
         fun requestKeyFrame() {
+            val now = System.nanoTime()
+            if (now - lastKeyRequest < 200_000_000) return
+            lastKeyRequest = now
             codec.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
         }
         try {
             while (running.get()) {
+                if (syncRequested.getAndSet(false)) requestKeyFrame()
                 val index = codec.dequeueOutputBuffer(info, 20_000)
                 if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    headers = listOf("csd-0", "csd-1").mapNotNull { codec.outputFormat.getByteBuffer(it) }
-                        .fold(ByteArray(0)) { bytes, buffer -> bytes + annexB(buffer.duplicate()) }
+                    listOf("csd-0", "csd-1").mapNotNull { codec.outputFormat.getByteBuffer(it) }
+                        .forEach { headers.add(annexB(it.duplicate())) }
                 } else if (index >= 0) {
                     try {
                         val buffer = codec.getOutputBuffer(index) ?: continue
@@ -86,11 +94,17 @@ internal class VisualStreamEncoder(
                         buffer.position(info.offset); buffer.limit(info.offset + info.size)
                         val bytes = annexB(buffer.slice())
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
-                            headers = bytes; continue
+                            headers.add(bytes); continue
                         }
                         val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                         if (firstTimestamp < 0) firstTimestamp = info.presentationTimeUs
                         val timeUs = (info.presentationTimeUs - firstTimestamp).coerceAtLeast(0)
+                        if (!headers.complete) { requestKeyFrame(); continue }
+                        if (direct != null) {
+                            direct.configure(width, height, headers.bytes)
+                            direct.offer((if (key) headers.bytes else byteArrayOf()) + bytes, timeUs, key)
+                            continue
+                        }
                         // A slow preset load can leave a gap. End the old segment before the
                         // gap and restart at a key frame with an explicit HLS discontinuity.
                         if (segmentStart >= 0 && previousTime >= 0 && timeUs - previousTime > 500_000) {
@@ -111,7 +125,7 @@ internal class VisualStreamEncoder(
                             discontinuity = nextDiscontinuity; nextDiscontinuity = false
                         }
                         muxer.video(byteArrayOf(0, 0, 0, 1, 9, 0xf0.toByte()) +
-                            (if (key) headers else ByteArray(0)) + bytes, timeUs)
+                            (if (key) headers.bytes else ByteArray(0)) + bytes, timeUs)
                         check(muxer.byteCount <= 8 * 1024 * 1024) { "Encoder did not produce key frames" }
                         previousTime = timeUs
                     } finally { codec.releaseOutputBuffer(index, false) }
@@ -125,6 +139,7 @@ internal class VisualStreamEncoder(
     /** Called after the GL output is detached, so no producer can write into a released surface. */
     override fun close() {
         if (!running.getAndSet(false)) return
+        direct?.requestKeyFrame = null
         if (Thread.currentThread() !== drainThread) drainThread.join(1000)
         runCatching { codec.stop() }
         runCatching { codec.release() }

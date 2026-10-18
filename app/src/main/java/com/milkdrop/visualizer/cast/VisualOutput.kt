@@ -32,12 +32,14 @@ class VisualOutput(
     private var closed = false
     private var started = false
     private var displayInitialized = false
+    private var consumerFence = 0L
 
     /** Called on the existing render thread. Neither UI views nor audio enter this copy. */
     @Synchronized fun draw(w: Int, h: Int) {
         val now = System.nanoTime()
-        if (closed || now < nextFrame || w <= 0 || h <= 0) return
-        nextFrame = now + 1_000_000_000L / 30
+        if (closed || now + 2_000_000 < nextFrame || w <= 0 || h <= 0) return
+        val interval = 1_000_000_000L / 30
+        nextFrame = if (nextFrame == 0L || now - nextFrame > interval) now + interval else nextFrame + interval
         val oldDisplay = EGL14.eglGetCurrentDisplay()
         val oldContext = EGL14.eglGetCurrentContext()
         val oldDraw = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW)
@@ -47,6 +49,10 @@ class VisualOutput(
             check(surface.isValid) { "Casting surface disconnected" }
             if (context == EGL14.EGL_NO_CONTEXT) initialize(oldDisplay, oldContext)
             check(producer == oldContext) { "Graphics context changed during casting" }
+            if (consumerFence != 0L) {
+                GLES30.glWaitSync(consumerFence, 0, GLES30.GL_TIMEOUT_IGNORED)
+                GLES30.glDeleteSync(consumerFence); consumerFence = 0
+            }
             val active = integer(GLES30.GL_ACTIVE_TEXTURE)
             GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
             val binding = integer(GLES30.GL_TEXTURE_BINDING_2D)
@@ -55,8 +61,10 @@ class VisualOutput(
                 GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, 0)
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture)
                 if (sourceWidth != w || sourceHeight != h) {
-                    GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, w, h, 0,
-                        GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+                    // GLSurfaceView requests RGB without alpha. ES disallows copying RGB
+                    // into RGBA; RGB accepts both RGB and RGBA source framebuffers.
+                    GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGB, w, h, 0,
+                        GLES30.GL_RGB, GLES30.GL_UNSIGNED_BYTE, null)
                     sourceWidth = w; sourceHeight = h
                 }
                 GLES30.glCopyTexSubImage2D(GLES30.GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h)
@@ -82,6 +90,8 @@ class VisualOutput(
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture)
             GLES30.glUniform1i(GLES30.glGetUniformLocation(program, "frame"), 0)
             GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3)
+            consumerFence = GLES30.glFenceSync(GLES30.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)
+            GLES30.glFlush()
             if (encoded) EGLExt.eglPresentationTimeANDROID(display, window, now)
             check(EGL14.eglSwapBuffers(display, window)) { "Receiver stopped accepting frames" }
             if (!started) { started = true; onStarted() }
@@ -134,8 +144,8 @@ class VisualOutput(
         var result = 0
         try {
             for ((type, source) in listOf(
-                GLES30.GL_VERTEX_SHADER to "#version 300 es\nout vec2 uv;void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);uv=p;gl_Position=vec4(p*2.0-1.0,0,1);}",
-                GLES30.GL_FRAGMENT_SHADER to "#version 300 es\nprecision mediump float;uniform sampler2D frame;in vec2 uv;out vec4 color;void main(){color=texture(frame,uv);}",
+                GLES30.GL_VERTEX_SHADER to "#version 300 es\nout highp vec2 uv;void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);uv=p;gl_Position=vec4(p*2.0-1.0,0,1);}",
+                GLES30.GL_FRAGMENT_SHADER to "#version 300 es\nprecision highp float;uniform highp sampler2D frame;in highp vec2 uv;out vec4 color;void main(){color=texture(frame,uv);}",
             )) {
                 val shader = GLES30.glCreateShader(type); shaders.add(shader)
                 GLES30.glShaderSource(shader, source); GLES30.glCompileShader(shader)
@@ -159,6 +169,7 @@ class VisualOutput(
         val oldDraw = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW); val oldRead = EGL14.eglGetCurrentSurface(EGL14.EGL_READ)
         if (context != EGL14.EGL_NO_CONTEXT && cleanupSurface != EGL14.EGL_NO_SURFACE &&
             EGL14.eglMakeCurrent(display, cleanupSurface, cleanupSurface, context)) {
+            if (consumerFence != 0L) { GLES30.glDeleteSync(consumerFence); consumerFence = 0 }
             if (texture != 0) GLES30.glDeleteTextures(1, intArrayOf(texture), 0)
             if (program != 0) GLES30.glDeleteProgram(program)
             EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)

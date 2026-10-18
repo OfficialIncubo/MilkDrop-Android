@@ -1,5 +1,8 @@
 <resources>
     <string name="cast_start">Cast</string>
+    <string name="cast_live_device">%1$s (MilkDrop Live)</string>
+    <string name="cast_receiving">Receiving visuals…</string>
+    <string name="cast_receiving_from">Connecting to %1$s…\nPress Back to stop receiving.</string>
     <string name="cast_stop">Stop cast</string>
     <string name="cast_connecting">Connecting…</string>
     <string name="cast_choose_device">Cast to</string>

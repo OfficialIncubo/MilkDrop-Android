@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.SurfaceHolder
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -44,6 +45,7 @@ import com.milkdrop.visualizer.R
 import com.milkdrop.visualizer.audio.AudioCaptureManager
 import com.milkdrop.visualizer.audio.AudioInput
 import com.milkdrop.visualizer.cast.CastingController
+import com.milkdrop.visualizer.cast.DirectCastReceiver
 import com.milkdrop.visualizer.databinding.ActivityMainBinding
 import com.milkdrop.visualizer.presets.PresetListCache
 import com.milkdrop.visualizer.presets.PresetPaths
@@ -69,6 +71,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var presetAdapter: PresetListAdapter
     private lateinit var settings: AppSettings
     private var castingController: CastingController? = null
+    private var castState = CastingController.State(false)
+    private var tvReceiver: DirectCastReceiver? = null
+    private var receivingLive = false
+    private var foreground = false
+    private var resumeAudioAfterReceiver = false
+    private val stopReceiverOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() { tvReceiver?.stopStream() }
+    }
 
     private var autoAdvanceEnabled = true
     private var shuffleEnabled = true
@@ -199,19 +209,9 @@ class MainActivity : AppCompatActivity() {
 
         setupGestures()
         castingController = CastingController(this, surfaceView, onState = { state ->
-            val showCast = state.available || state.device != null
-            if (binding.btnCast.isVisible != showCast) {
-                binding.btnCast.isVisible = showCast
-                ViewCompat.requestApplyInsets(binding.root)
-            }
-            binding.btnCast.setText(when {
-                state.connecting -> R.string.cast_connecting
-                state.device != null -> R.string.cast_stop
-                else -> R.string.cast_start
-            })
-            binding.btnCast.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                if (state.device != null) R.drawable.ic_cast_off else R.drawable.ic_cast, 0, 0, 0)
-            binding.castStatus.isVisible = state.casting
+            castState = state
+            updateCastButton()
+            binding.castStatus.isVisible = state.casting && !receivingLive
             binding.castDeviceName.text = state.device
         }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() })
         binding.btnCast.setOnClickListener { castingController?.chooseOrStop() }
@@ -219,9 +219,11 @@ class MainActivity : AppCompatActivity() {
         setupSettingsSheet()
         setupPlaylistPanel()
         onBackPressedDispatcher.addCallback(this, closePanelOnBack)
+        onBackPressedDispatcher.addCallback(this, stopReceiverOnBack)
         applyOrientation(resources.configuration.orientation)
         applySystemBarInsets()
         if (isTelevision()) {
+            setupTvReceiver()
             remoteNavigation = true
             showRemoteControls()
         }
@@ -394,6 +396,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTopLabel() {
+        updateCastButton()
+        if (receivingLive) { binding.presetStatus.isVisible = false; return }
         val label = binding.presetStatus
         val message = statusMessage
         if (message != null) {
@@ -408,6 +412,69 @@ class MainActivity : AppCompatActivity() {
                 SystemClock.uptimeMillis() < presetNameShownUntil)
         label.text = name
         label.isVisible = name != null && shown
+    }
+
+    private fun updateCastButton() {
+        val state = castState
+        val visible = !receivingLive && !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible &&
+            (state.available || state.device != null)
+        if (binding.btnCast.isVisible != visible) {
+            binding.btnCast.isVisible = visible
+            ViewCompat.requestApplyInsets(binding.root)
+        }
+        val label = when {
+            state.connecting -> R.string.cast_connecting
+            state.device != null -> R.string.cast_stop
+            else -> R.string.cast_start
+        }
+        binding.castButtonText.setText(label)
+        binding.btnCast.contentDescription = getString(label)
+        binding.castConnecting.isVisible = state.connecting
+        binding.castButtonIcon.isVisible = !state.connecting
+        binding.castButtonIcon.setImageResource(if (state.device != null) R.drawable.ic_cast_off else R.drawable.ic_cast)
+    }
+
+    private fun setupTvReceiver() {
+        binding.receiverVideo.setZOrderMediaOverlay(true)
+        binding.receiverVideo.holder.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) { tvReceiver?.offerSurface(holder.surface) }
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                tvReceiver?.offerSurface(holder.surface)
+            }
+            override fun surfaceDestroyed(holder: SurfaceHolder) { tvReceiver?.stopStream() }
+        })
+        tvReceiver = DirectCastReceiver(this, onIncoming = { sender ->
+            receivingLive = true
+            if (binding.playlistPanel.isVisible) closePlaylistPanel()
+            resumeAudioAfterReceiver = true
+            castingController?.pause()
+            audioCaptureManager.stopAll()
+            surfaceView.onPause()
+            binding.settingsSheet.isVisible = false
+            binding.playlistPanel.isVisible = false
+            binding.controlBar.isVisible = false
+            closePanelOnBack.isEnabled = false
+            stopReceiverOnBack.isEnabled = true
+            binding.receiverWaiting.text = getString(R.string.cast_receiving_from, sender)
+            binding.receiverWaiting.isVisible = true
+            binding.receiverPanel.isVisible = true
+            binding.castStatus.isVisible = false
+            tvReceiver?.offerSurface(binding.receiverVideo.holder.surface)
+            updateTopLabel()
+        }, onPresented = { binding.receiverWaiting.isVisible = false }, onStopped = {
+            if (receivingLive) {
+                receivingLive = false
+                stopReceiverOnBack.isEnabled = false
+                binding.receiverPanel.isVisible = false
+                if (foreground) {
+                    surfaceView.onResume()
+                    castingController?.start()
+                    resumeAudioAfterReceiver = false
+                    startPersistedAudioSource()
+                }
+                updateTopLabel()
+            }
+        }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() })
     }
 
     /**
@@ -495,9 +562,14 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (graphicsBlocked) return
+        foreground = true
         surfaceView.onResume()
         castingController?.start()
-        if (resumeAutomaticAudio) {
+        tvReceiver?.start()
+        if (resumeAudioAfterReceiver) {
+            resumeAudioAfterReceiver = false; resumeAutomaticAudio = false
+            startPersistedAudioSource()
+        } else if (resumeAutomaticAudio) {
             resumeAutomaticAudio = false
             if (settings.audioInput == AudioInput.AUTOMATIC) startPersistedAudioSource()
         }
@@ -575,6 +647,8 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (graphicsBlocked) return
+        foreground = false
+        tvReceiver?.stop()
         castingController?.pause()
         consumedRemoteKeys.clear()
         if (settings.audioInput == AudioInput.AUTOMATIC) {
@@ -587,6 +661,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        tvReceiver?.close(); tvReceiver = null
         castingController?.close()
         castingController = null
         super.onDestroy()
@@ -998,6 +1073,12 @@ class MainActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (graphicsBlocked || !::binding.isInitialized) return super.dispatchKeyEvent(event)
         val key = event.keyCode
+        if (receivingLive) {
+            if (key in intArrayOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MENU)) return true
+            return super.dispatchKeyEvent(event) // Back stops receiving; volume/system keys keep working.
+        }
         // Keep repeats and key-up away from whichever panel a shortcut just opened.
         if (key in consumedRemoteKeys) {
             if (event.action == KeyEvent.ACTION_UP) consumedRemoteKeys.remove(key)
@@ -1093,6 +1174,7 @@ class MainActivity : AppCompatActivity() {
     private fun startPersistedAudioSource() = startAudioInput(settings.audioInput)
 
     private fun startAudioInput(input: AudioInput) {
+        if (receivingLive || isDestroyed) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED) {
             audioCaptureManager.stopAll()

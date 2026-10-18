@@ -14,6 +14,17 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <FrameLayout android:id="@+id/receiverPanel" android:layout_width="match_parent"
+        android:layout_height="match_parent" android:background="@android:color/black"
+        android:visibility="gone">
+        <SurfaceView android:id="@+id/receiverVideo" android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+        <TextView android:id="@+id/receiverWaiting" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:layout_gravity="center"
+            android:gravity="center" android:padding="32dp" android:textSize="20sp"
+            android:textColor="@color/overlay_content" android:text="@string/cast_receiving" />
+    </FrameLayout>
+
     <!-- The renderer keeps running beneath this View; its framebuffer alone goes to the TV. -->
     <LinearLayout
         android:id="@+id/castStatus"
@@ -37,23 +48,32 @@
             android:textSize="16sp" />
     </LinearLayout>
 
-    <androidx.appcompat.widget.AppCompatTextView
+    <LinearLayout
         android:id="@+id/btnCast"
         android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_gravity="top|end"
         android:layout_margin="16dp"
         android:paddingHorizontal="16dp"
-        android:drawablePadding="8dp"
         android:gravity="center"
+        android:orientation="horizontal"
         android:background="@drawable/cast_button_background"
         android:focusable="true"
         android:clickable="true"
-        android:text="@string/cast_start"
-        android:textColor="@color/overlay_content"
-        android:textSize="16sp"
         android:visibility="gone"
-        app:drawableStartCompat="@drawable/ic_cast" />
+        android:contentDescription="@string/cast_start">
+        <ImageView android:id="@+id/castButtonIcon" android:layout_width="24dp"
+            android:layout_height="24dp" android:importantForAccessibility="no"
+            app:srcCompat="@drawable/ic_cast" />
+        <ProgressBar android:id="@+id/castConnecting" style="?android:attr/progressBarStyleSmall"
+            android:layout_width="24dp" android:layout_height="24dp" android:visibility="gone"
+            android:indeterminate="true" android:indeterminateTint="@color/overlay_content"
+            android:importantForAccessibility="no" />
+        <TextView android:id="@+id/castButtonText" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:layout_marginStart="8dp"
+            android:text="@string/cast_start" android:textColor="@color/overlay_content"
+            android:textSize="16sp" android:importantForAccessibility="no" />
+    </LinearLayout>
 
     <!-- Plain shadowed text rather than a badge or panel, so it doesn't box off part of the visual.
          Shows the current preset's name, or a status message while presets load. -->

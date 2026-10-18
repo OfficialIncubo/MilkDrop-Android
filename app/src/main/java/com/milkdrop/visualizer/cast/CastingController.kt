@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -69,27 +70,34 @@ class CastingController(
     private var mediaClient: RemoteMediaClient? = null
     private var chooser: AlertDialog? = null
     private var chooserAdapter: ArrayAdapter<String>? = null
-    private var choices: List<MediaRouter.RouteInfo> = emptyList()
+    private sealed class Choice(val name: String) {
+        class Direct(val device: DirectCastDevice, name: String) : Choice(name)
+        class Route(val route: MediaRouter.RouteInfo) : Choice(route.name)
+    }
+    private var choices: List<Choice> = emptyList()
+    private var directDevices: List<DirectCastDevice> = emptyList()
+    private val directDiscovery = DirectCastDiscovery(context) { devices -> directDevices = devices; refresh() }
+    private var directSender: DirectVideoSender? = null
     private val timeout = Runnable { if (connecting) fail(generation, IllegalStateException("Casting timed out")) }
 
     private val routes = object : MediaRouter.Callback() {
         override fun onRouteAdded(r: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
         override fun onRouteRemoved(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (device != null && route.isSelected) stop() else refresh()
+            if (directSender == null && device != null && route.isSelected) stop() else refresh()
         }
         override fun onRouteChanged(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (device != null && route.isSelected && !route.isEnabled) stop() else refresh()
+            if (directSender == null && device != null && route.isSelected && !route.isEnabled) stop() else refresh()
         }
         override fun onRouteSelected(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (!started || route.isDefault || route.isBluetooth) return
+            if (!started || directSender != null || route.isDefault || route.isBluetooth) return
             if (device == null) begin(route.name)
             if (CastDevice.getFromBundle(route.extras) == null) showPresentation(route)
         }
         override fun onRouteUnselected(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (!route.isDefault && device != null) stop(selectLocal = false)
+            if (!route.isDefault && device != null && directSender == null) stop(selectLocal = false)
         }
         override fun onRoutePresentationDisplayChanged(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (route.isSelected && device != null && CastDevice.getFromBundle(route.extras) == null) {
+            if (directSender == null && route.isSelected && device != null && CastDevice.getFromBundle(route.extras) == null) {
                 if (route.presentationDisplay == null && presentation != null) stop() else showPresentation(route)
             }
             refresh()
@@ -115,8 +123,12 @@ class CastingController(
         override fun onSessionStarted(s: CastSession, id: String) = startGoogleStream(s)
         override fun onSessionResumed(s: CastSession, suspended: Boolean) = startGoogleStream(s)
         override fun onSessionEnded(s: CastSession, error: Int) { if (session === s) stop(selectLocal = false) }
-        override fun onSessionStartFailed(s: CastSession, error: Int) = fail(generation, IllegalStateException("Cast connection failed: $error"))
-        override fun onSessionResumeFailed(s: CastSession, error: Int) = fail(generation, IllegalStateException("Cast resume failed: $error"))
+        override fun onSessionStartFailed(s: CastSession, error: Int) {
+            if (directSender == null) fail(generation, IllegalStateException("Cast connection failed: $error"))
+        }
+        override fun onSessionResumeFailed(s: CastSession, error: Int) {
+            if (directSender == null) fail(generation, IllegalStateException("Cast resume failed: $error"))
+        }
         override fun onSessionSuspended(s: CastSession, reason: Int) { if (session === s) stop() }
         override fun onSessionStarting(s: CastSession) = Unit
         override fun onSessionEnding(s: CastSession) = Unit
@@ -139,6 +151,7 @@ class CastingController(
     fun start() {
         if (closed || started) return
         started = true
+        directDiscovery.start()
         discover(active = false)
         castContext?.sessionManager?.addSessionManagerListener(sessions, CastSession::class.java)
         refresh()
@@ -148,6 +161,7 @@ class CastingController(
         if (!started) return
         stop()
         started = false
+        directDiscovery.stop()
         chooser?.dismiss(); chooser = null
         router.removeCallback(routes)
         castContext?.sessionManager?.removeSessionManagerListener(sessions, CastSession::class.java)
@@ -160,9 +174,13 @@ class CastingController(
         chooserAdapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, choices.map { it.name })
         chooser = AlertDialog.Builder(context).setTitle(R.string.cast_choose_device)
             .setAdapter(chooserAdapter) { _, index ->
-                choices.getOrNull(index)?.takeIf { it.isEnabled }?.let { route ->
-                    begin(route.name)
-                    router.selectRoute(route)
+                when (val choice = choices.getOrNull(index)) {
+                    is Choice.Direct -> startDirectStream(choice.device)
+                    is Choice.Route -> if (choice.route.isEnabled) {
+                        begin(choice.name)
+                        router.selectRoute(choice.route)
+                    }
+                    null -> Unit
                 }
             }.setNegativeButton(android.R.string.cancel, null).create().also { dialog ->
                 dialog.setOnDismissListener {
@@ -195,7 +213,8 @@ class CastingController(
 
     private fun refresh() {
         if (closed) return
-        choices = router.routes.filter(::compatible)
+        choices = directDevices.map { Choice.Direct(it, context.getString(R.string.cast_live_device, it.name)) } +
+            router.routes.filter(::compatible).map { Choice.Route(it) }
         chooserAdapter?.apply { clear(); addAll(choices.map { it.name }); notifyDataSetChanged() }
         onState(State(started && choices.isNotEmpty(), device, connecting, casting))
     }
@@ -223,7 +242,7 @@ class CastingController(
     }
 
     private fun startGoogleStream(s: CastSession) {
-        if (!started || closed || streamStarting || session === s) return
+        if (!started || closed || directSender != null || streamStarting || session === s) return
         if (device == null) { castContext?.sessionManager?.endCurrentSession(true); return }
         session = s; streamStarting = true
         val id = generation
@@ -249,6 +268,39 @@ class CastingController(
                 }
             } catch (e: Exception) {
                 pendingEncoder?.close(); pendingServer?.close()
+                main.post { fail(id, e) }
+            }
+        }
+    }
+
+    private fun startDirectStream(target: DirectCastDevice) {
+        begin(target.name)
+        val id = generation
+        val sender = DirectVideoSender(onPresented = {
+            main.post { if (id == generation && started && device != null) {
+                connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
+            } }
+        }, onStopped = { main.post { if (id == generation) stop() } },
+            onError = { error -> main.post { fail(id, error) } })
+        directSender = sender // Stop can interrupt a pending socket connection immediately.
+        worker.execute {
+            var video: VisualStreamEncoder? = null
+            try {
+                sender.connect(target, "${Build.MANUFACTURER} ${Build.MODEL}".trim())
+                video = VisualStreamEncoder(onReady = {},
+                    onError = { error -> main.post { fail(id, error) } }, direct = sender)
+                val pending = video
+                main.post {
+                    if (id != generation || !started || closed) {
+                        sender.close(); cleanup(null, pending, null)
+                    } else {
+                        encoder = pending
+                        installOutput(VisualOutput(pending.surface, pending.width, pending.height, true,
+                            { error -> main.post { fail(id, error) } }), pending.width to pending.height)
+                    }
+                }
+            } catch (e: Exception) {
+                sender.close(); video?.close()
                 main.post { fail(id, e) }
             }
         }
@@ -281,6 +333,7 @@ class CastingController(
         val oldOutput = output; val oldEncoder = encoder; val oldServer = server
         renderer.milkDropRenderer.visualOutput = null; renderer.setCastSize(null)
         output = null; encoder = null; server = null; streamStarting = false
+        directSender?.close(); directSender = null
         mediaClient?.unregisterCallback(mediaEvents); mediaClient = null
         val hadSession = session != null; session = null
         val oldPresentation = presentation; presentation = null
@@ -328,7 +381,9 @@ class CastingController(
     override fun close() {
         if (closed) return
         pause(); closed = true
-        main.removeCallbacksAndMessages(null)
+        // Pending install callbacks own encoders/sockets. Let their generation guards release
+        // those resources instead of discarding the callbacks when the Activity is destroyed.
+        main.removeCallbacks(timeout)
         worker.shutdown() // Drain resource cleanup already queued; never interrupt codec release.
     }
 

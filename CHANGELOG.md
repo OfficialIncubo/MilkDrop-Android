@@ -6,6 +6,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Direct MilkDrop Live receiving in the foreground TV app, discovered on the local network.
+  Send H.264 frames with decoder feedback, bounded queues and key-frame recovery instead
+  of a buffered video-player timeline. Restore local TV rendering/audio on disconnect.
 - Foreground visual casting to Google Cast video receivers and Android-exposed external
   display/Miracast routes. Show a rounded Cast/Stop cast button as receivers appear, keep
   controls on the phone, and return visuals locally when casting stops. Use bounded stream
@@ -20,6 +23,11 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Use an RGB casting texture compatible with alpha-less render surfaces, fixing invalid
+  framebuffer copies that could leave the receiver gray. Synchronize shared casting
+  textures in both directions, match shader varying precision,
+  preserve AVC parameter sets reported separately, and avoid skipping frames at 30 fps.
+- Hide Cast/Stop cast while Settings or the preset list is open; show a connecting spinner.
 - Accept bare `randXX` texture calls alongside `sampler_randXX` names. Bind short
   random-texture aliases to the selected texture unit, retain each shader's sampler
   name and filter/wrap settings when reusing a random slot, and deduplicate shared

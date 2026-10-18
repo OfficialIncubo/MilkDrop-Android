@@ -138,7 +138,17 @@ A rounded **Cast** button appears at the upper right when a compatible display i
 Choose a TV or projector to send only the visuals. The phone shows the receiver's name and
 keeps preset controls, swipe gestures, the list and Settings available. **Stop cast** restores
 the visuals to the phone without restarting the preset.
+The button hides while Settings or the preset list is open and shows a spinner while connecting.
 
+- **MilkDrop Live (recommended for live visuals):** install this version of MilkDrop on an
+  Android TV/projector and keep the TV app open. Connect both devices to the same local
+  network, then choose **TV name (MilkDrop Live)** on the phone. No Google Play services are
+  required for this path. Direct H.264 decoding, decoder feedback and a bounded frame queue
+  avoid the video player's multi-second playback buffer. Slow connections drop stale frames
+  and recover at a fresh key frame; actual latency still depends on Wi-Fi and the TV decoder.
+  The TV pauses its local renderer and audio capture while receiving; press **Back** on the
+  TV remote or **Stop cast** on the phone to return to local visuals. Receiving is advertised
+  only while the TV app is in the foreground. Android 9 remains supported.
 - **Google Cast / Chromecast / Google TV:** requires Google Play services and a receiver on
   the same reachable Wi-Fi or Ethernet network. The phone serves a session-only H.264 live
   stream; receiver buffering adds several seconds of delay. Guest networks that isolate
@@ -150,10 +160,10 @@ the visuals to the phone without restarting the preset.
 
 Casting sends no audio and does not capture the sidebar or other apps. Existing audio modes
 keep feeding projectM. Casting runs only while MilkDrop is in the foreground and stops on
-app pause, disconnection or failure; the phone then resumes local visuals. Google Cast
+app pause, disconnection or failure; the phone then resumes local visuals. Network video
 encoding is capped at 960×544 at 30 fps, with a 640×368 fallback, to limit work on older
 devices. Android 9 remains the minimum supported version. Device discovery and playback
-still need verification on physical receivers; a compatible receiver must advertise a route
+still need verification on physical receivers; a compatible receiver must advertise a service or route
 before the Cast button can appear.
 
 Preset names, favourites, and the resume preset follow the filename confirmed by a successful
