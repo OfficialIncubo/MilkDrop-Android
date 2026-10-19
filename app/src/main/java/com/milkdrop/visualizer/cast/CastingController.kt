@@ -47,12 +47,17 @@ class CastingController(
     private val onError: () -> Unit,
 ) : Closeable {
     data class State(val available: Boolean, val device: String? = null,
-        val connecting: Boolean = false, val casting: Boolean = false)
+        val connecting: Boolean = false, val casting: Boolean = false,
+        val disconnecting: Boolean = false, val wireless: Boolean = false, val buffered: Boolean = false)
 
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val router = MediaRouter.getInstance(context)
     private val displays = context.getSystemService(DisplayManager::class.java)
+    private val systemRoutes = SystemDisplayRoutes(context)
+    private data class PendingDisconnect(val displayId: Int, val name: String, var prompted: Boolean = false)
+    private var pendingDisconnect: PendingDisconnect? = null
+    private val checkDisconnect = Runnable { verifyDisconnect(prompt = true) }
     private val suppressedDisplays = mutableSetOf<Int>()
     private val selector = MediaRouteSelector.Builder()
         .addControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO)
@@ -77,7 +82,7 @@ class CastingController(
     private sealed class Choice(val name: String) {
         class Direct(val device: DirectCastDevice, name: String) : Choice(name)
         class Route(val route: MediaRouter.RouteInfo) : Choice(route.name)
-        class Connected(val display: Display) : Choice(display.name)
+        class Connected(val display: Display, name: String) : Choice(name)
         class WirelessSettings(name: String) : Choice(name)
     }
     private var choices: List<Choice> = emptyList()
@@ -96,6 +101,7 @@ class CastingController(
         }
         override fun onDisplayRemoved(displayId: Int) {
             suppressedDisplays.remove(displayId)
+            if (pendingDisconnect?.displayId == displayId) { pendingDisconnect = null; main.removeCallbacks(checkDisconnect) }
             if (presentation?.display?.displayId == displayId) stop(selectLocal = false, suppressDisplay = false)
             refresh()
         }
@@ -110,7 +116,7 @@ class CastingController(
             if (directSender == null && device != null && route.isSelected && !route.isEnabled) stop() else refresh()
         }
         override fun onRouteSelected(r: MediaRouter, route: MediaRouter.RouteInfo) {
-            if (!started || directSender != null || route.isDefault || route.isBluetooth) return
+            if (!started || pendingDisconnect != null || directSender != null || route.isDefault || route.isBluetooth) return
             if (device == null) begin(route.name)
             if (CastDevice.getFromBundle(route.extras) == null) showPresentation(route)
         }
@@ -181,7 +187,7 @@ class CastingController(
         discover(active = false)
         castContext?.sessionManager?.addSessionManagerListener(sessions, CastSession::class.java)
         refresh()
-        adoptConnectedDisplay()
+        if (pendingDisconnect != null) verifyDisconnect(prompt = false) else adoptConnectedDisplay()
     }
 
     fun pause() {
@@ -190,6 +196,7 @@ class CastingController(
         // wireless link intact so its presentation display can be adopted on return.
         stop(selectLocal = false, suppressDisplay = false)
         started = false
+        main.removeCallbacks(checkDisconnect)
         displays.unregisterDisplayListener(displayEvents)
         directDiscovery.stop()
         chooser?.dismiss(); chooser = null
@@ -198,7 +205,7 @@ class CastingController(
     }
 
     fun chooseOrStop() {
-        if (device != null) { stop(); return }
+        if (device != null || pendingDisconnect != null) { requestStop(); return }
         refresh()
         if (choices.isEmpty()) return
         chooserAdapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, choices.map { it.name })
@@ -230,6 +237,7 @@ class CastingController(
     }
 
     fun openWirelessDisplaySettings(): Boolean {
+        if (presentation != null || pendingDisconnect != null) { requestStop(); return true }
         val opened = WirelessDisplaySettings.open(context)
         if (opened) suppressedDisplays.clear()
         return opened
@@ -256,26 +264,60 @@ class CastingController(
 
     private fun refresh() {
         if (closed) return
+        presentation?.display?.let { device = displayName(it) }
         val routes = router.routes.filter(::compatible)
         val routedDisplays = routes.mapNotNull { it.presentationDisplay?.displayId }.toSet()
         val receivers = directDevices.map { Choice.Direct(it, context.getString(R.string.cast_live_device, it.name)) } +
-            routes.map { Choice.Route(it) } + connectedDisplays().filter { it.displayId !in routedDisplays }.map { Choice.Connected(it) }
+            routes.map { Choice.Route(it) } + connectedDisplays().filter { it.displayId !in routedDisplays }.map { Choice.Connected(it, displayName(it)) }
         choices = receivers + if (WirelessDisplaySettings.available(context))
             listOf(Choice.WirelessSettings(context.getString(R.string.cast_wireless_settings))) else emptyList()
         chooserAdapter?.apply { clear(); addAll(choices.map { it.name }); notifyDataSetChanged() }
         // A settings shortcut isn't a discovered receiver: keep the floating button honest.
-        onState(State(started && receivers.isNotEmpty(), device, connecting, casting))
+        val ending = pendingDisconnect
+        onState(State(started && receivers.isNotEmpty(), ending?.name ?: device,
+            connecting || ending?.let { !it.prompted } == true, casting || ending != null, ending != null,
+            presentation != null || ending != null, session != null))
+    }
+
+    private fun displayName(display: Display): String {
+        val routeNames = router.routes.filter { it.presentationDisplay?.displayId == display.displayId }.map { it.name }
+        return ReceiverNames.choose(routeNames + systemRoutes.names(display) + listOf(display.name, device),
+            context.getString(R.string.cast_wireless_device))
     }
 
     private fun connectedDisplays() = displays.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
         .filter { it.isValid && it.displayId != Display.DEFAULT_DISPLAY }
 
     private fun adoptConnectedDisplay() {
-        if (!started || closed || device != null) return
+        if (!started || closed || device != null || pendingDisconnect != null) return
         val connected = connectedDisplays()
         suppressedDisplays.retainAll(connected.map { it.displayId }.toSet())
         val display = connected.firstOrNull { it.displayId !in suppressedDisplays } ?: return
-        begin(display.name); showPresentation(display)
+        begin(displayName(display)); showPresentation(display)
+    }
+
+    /** Keep reporting the connection until Android confirms the display was removed. */
+    private fun requestStop() {
+        if (pendingDisconnect != null) { verifyDisconnect(prompt = true, force = true); return }
+        val display = presentation?.display
+        if (display == null) { stop(); return }
+        pendingDisconnect = PendingDisconnect(display.displayId, device ?: displayName(display))
+        stop()
+        systemRoutes.disconnect(display)
+        main.postDelayed(checkDisconnect, 1500)
+    }
+
+    private fun verifyDisconnect(prompt: Boolean, force: Boolean = false) {
+        val ending = pendingDisconnect ?: return
+        if (displays.getDisplay(ending.displayId)?.isValid != true) {
+            pendingDisconnect = null; refresh(); return
+        }
+        if (started && prompt && (!ending.prompted || force)) {
+            ending.prompted = true
+            Toast.makeText(context, R.string.cast_finish_disconnect, Toast.LENGTH_LONG).show()
+            WirelessDisplaySettings.open(context)
+        }
+        refresh()
     }
 
     private fun showPresentation(route: MediaRouter.RouteInfo) {
@@ -413,7 +455,8 @@ class CastingController(
         cleanup(oldOutput, oldEncoder, oldServer)
         oldPresentation?.dismiss()
         if (hadSession) castContext?.sessionManager?.endCurrentSession(true)
-        if (selectLocal && !router.selectedRoute.isDefault) router.selectRoute(router.defaultRoute)
+        if (selectLocal) runCatching { router.unselect(MediaRouter.UNSELECT_REASON_STOPPED) }
+            .onFailure { Log.i(TAG, "System route needs manual disconnection", it) }
         refresh()
     }
 
@@ -456,6 +499,7 @@ class CastingController(
         // Pending install callbacks own encoders/sockets. Let their generation guards release
         // those resources instead of discarding the callbacks when the Activity is destroyed.
         main.removeCallbacks(timeout)
+        main.removeCallbacks(checkDisconnect)
         worker.shutdown() // Drain resource cleanup already queued; never interrupt codec release.
     }
 

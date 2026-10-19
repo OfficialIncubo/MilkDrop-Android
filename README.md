@@ -162,8 +162,11 @@ The button hides while Settings or the preset list is open and shows a spinner w
   MilkDrop installation on the TV. The phone's firmware and TV must support Miracast;
   the app cannot add that protocol to a phone that lacks it. If the system only offers
   whole-screen mirroring without a presentation display, it mirrors the phone's UI too.
-  Stop cast ends MilkDrop's presentation; use system connection settings to disconnect
-  mirroring if the phone keeps that connection active.
+  Stop cast requests disconnection through Android's route APIs and checks whether the display
+  actually disappears. If firmware keeps mirroring, MilkDrop opens system connection settings
+  so you can finish disconnecting, and keeps reporting the connection until it ends. The system
+  three-dot Wireless display toggle and its wording belong to Android Settings; MilkDrop cannot
+  rename it or directly enable/disable that protected system setting.
 
 MilkDrop streams its visual framebuffer; its network video streams carry no audio or app UI.
 Android manages audio routing and whole-screen mirroring for system wireless displays.
@@ -201,11 +204,14 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
 - **Additional random time** — Off, 5, 10, 15, 20, 25 or 30 seconds. Adds a fresh random amount
   from zero up to the selected limit per preset. For example, 15 s plus up to 5 s means 15–20 s.
   Off is the default. Changing the limit also restarts the countdown.
-- **Transition time** — 0.5, 1, 1.5, 1.7 (default), 2 or 5 seconds for smooth transitions.
-  Changes apply to the next blend, preserving any blend already in progress.
+- **Transition time** — 0.5, 1, 1.5, 1.7 (default), 2, 2.5, 3 or 5 seconds, or Random.
+  Random picks one of those fixed durations independently for each preset change, including
+  automatic changes. The same duration drives the timer and rendered blend. Changes apply
+  to the next blend, preserving any blend already in progress.
 - **Transition** — Smooth blends using Transition time; Instant cuts straight to the next preset.
-- **Frame rate** — 30, 45, 60 or Max. MilkDrop's motion advances per frame, so presets move
-  faster at higher frame rates.
+- **Frame rate** — 24, 30, 45, 50, 60, 120 or Max (Unlimited). Max removes the app's cap;
+  rendering still follows display refresh and device performance. Casting video remains capped
+  at 30 FPS. Existing saved FPS choices are preserved when updating.
 - **Quality** — render resolution (High / Medium / Low). Low also uses a coarser warp mesh.
 - **Screen-Dependent Render Mode** — fit custom waves, shapes, built-in waves, and per-vertex
   motion to full-screen coordinates, following BeatDrop's screen-dependent convention. Off by

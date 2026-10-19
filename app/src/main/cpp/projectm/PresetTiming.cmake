@@ -5,6 +5,8 @@ patch_projectm_source(projectM_main src/libprojectM/TimeKeeper.hpp
 
     void RestartPresetCountdown();
     void SetCountdownEnabled(bool enabled);
+    double SampledTransitionDuration();
+    double ActiveSoftCutDuration() const { return m_activeSoftCutDuration; }
 ]=]
     [=[        m_presetDuration = seconds;]=]
     [=[        m_presetDuration = seconds;
@@ -30,7 +32,15 @@ patch_projectm_source(projectM_main src/libprojectM/TimeKeeper.cpp
         m_countdownTimeB = m_currentTime;
     }]=]
     [=[void TimeKeeper::StartPreset()]=]
-    [=[void TimeKeeper::RestartPresetCountdown()
+    [=[double TimeKeeper::SampledTransitionDuration()
+{
+    if (m_softCutDuration >= 0.0) return m_softCutDuration;
+    constexpr double choices[]{0.5, 1.0, 1.5, 1.7, 2.0, 2.5, 3.0, 5.0};
+    std::uniform_int_distribution<int> choose(0, sizeof(choices) / sizeof(choices[0]) - 1);
+    return choices[choose(m_randomGenerator)];
+}
+
+void TimeKeeper::RestartPresetCountdown()
 {
     m_countdownTimeA = m_currentTime;
     m_countdownTimeB = m_currentTime;
@@ -51,7 +61,7 @@ void TimeKeeper::StartPreset()]=]
     [=[    m_presetTimeB = m_currentTime;]=]
     [=[    m_presetTimeB = m_currentTime;
     m_countdownTimeB = m_currentTime;
-    m_activeSoftCutDuration = m_softCutDuration;]=]
+    m_activeSoftCutDuration = SampledTransitionDuration();]=]
     [=[    m_presetTimeA = m_presetTimeB;]=]
     [=[    m_presetTimeA = m_presetTimeB;
     m_countdownTimeA = m_countdownTimeB;]=]
@@ -80,6 +90,8 @@ void TimeKeeper::StartPreset()]=]
     return m_presetDuration + additionalTime(m_randomGenerator);]=]
 )
 patch_projectm_copy(projectM_main src/libprojectM/ProjectM.cpp
+    [=[m_transitionShaderManager->RandomTransition(), m_softCutDuration, m_timeKeeper->GetFrameTime()]=]
+    [=[m_transitionShaderManager->RandomTransition(), m_timeKeeper->ActiveSoftCutDuration(), m_timeKeeper->GetFrameTime()]=]
     [=[    m_presetLocked = locked;]=]
     [=[    m_timeKeeper->SetCountdownEnabled(!locked);
     m_presetLocked = locked;]=]

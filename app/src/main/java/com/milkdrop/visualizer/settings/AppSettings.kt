@@ -48,8 +48,12 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_HARD_CUT, value).apply()
 
     var fpsIndex: Int
-        get() = prefs.getInt(KEY_FPS_INDEX, 0)
-        set(value) = prefs.edit().putInt(KEY_FPS_INDEX, value).apply()
+        get() {
+            val legacy = FrameRates.legacy.getOrElse(prefs.getInt(KEY_FPS_INDEX, 0)) { 30 }
+            return FrameRates.indexFor(prefs.getInt(KEY_FPS_VALUE, legacy))
+        }
+        set(value) = prefs.edit().putInt(KEY_FPS_VALUE, FrameRates.options.getOrElse(value) { 30 })
+            .remove(KEY_FPS_INDEX).apply()
 
     var screenDependentRendering: Boolean
         get() = prefs.getBoolean(KEY_SCREEN_DEPENDENT_RENDERING, false)
@@ -106,6 +110,7 @@ class AppSettings(context: Context) {
         const val KEY_BEAT_CUTS = "beat_cuts_enabled"
         const val KEY_PRESET_NAME_TRANSITIONS = "show_preset_name_during_transitions"
         const val KEY_FPS_INDEX = "fps_index"
+        const val KEY_FPS_VALUE = "frames_per_second"
         const val KEY_QUALITY_INDEX = "quality_index"
         const val KEY_AUDIO_SENSITIVITY = "audio_sensitivity"
         const val KEY_FFT_SCALING = "fft_shader_scaling"

@@ -5,6 +5,11 @@
     <string name="cast_receiving_from">Connecting to %1$s…\nPress Back to stop receiving.</string>
     <string name="cast_stop">Stop cast</string>
     <string name="cast_connecting">Connecting…</string>
+    <string name="cast_disconnecting">Disconnecting…</string>
+    <string name="cast_wireless_disconnect">Disconnect wireless display…</string>
+    <string name="cast_finish_disconnect">The display is still connected. Disconnect it in your phone’s connection settings to stop sharing.</string>
+    <string name="cast_wireless_device">Wireless display</string>
+    <string name="cast_control_message_buffered">Your visuals are playing on your TV or projector. Google Cast video may be several seconds behind. Control presets and settings from this device.</string>
     <string name="cast_choose_device">Cast to</string>
     <string name="cast_wireless_settings">Wireless display / Miracast…</string>
     <string name="cast_wireless_description">Open your phone’s connection settings to find Miracast or Smart View displays. After connecting, return to MilkDrop. Available options depend on your phone and TV.</string>
@@ -52,9 +57,10 @@
         <item>20 s</item><item>25 s</item><item>30 s</item>
     </string-array>
     <string-array name="transition_time_options">
-        <item>0.5 s</item><item>1 s</item><item>1.5 s</item>
-        <item>1.7 s (default)</item><item>2 s</item><item>5 s</item>
+        <item>Random</item><item>0.5 s</item><item>1 s</item><item>1.5 s</item>
+        <item>1.7 s (default)</item><item>2 s</item><item>2.5 s</item><item>3 s</item><item>5 s</item>
     </string-array>
+    <string name="transition_random_description">Random chooses a new transition duration between 0.5 and 5 seconds for each preset change.</string>
     <string name="duration_10">10 s</string>
     <string name="duration_15">15 s</string>
     <string name="duration_30">30 s</string>
@@ -63,6 +69,11 @@
     <string name="transition_smooth">Smooth</string>
     <string name="transition_instant">Instant</string>
     <string name="setting_frame_rate">Frame rate</string>
+    <string-array name="frame_rate_options">
+        <item>24 FPS</item><item>30 FPS</item><item>45 FPS</item><item>50 FPS</item>
+        <item>60 FPS</item><item>120 FPS</item><item>Max (Unlimited)</item>
+    </string-array>
+    <string name="frame_rate_description">Max removes the app’s FPS limit. Actual speed depends on your display and device. Casting video is limited to 30 FPS.</string>
     <string name="fps_30">30</string>
     <string name="fps_45">45</string>
     <string name="fps_60">60</string>

@@ -38,11 +38,13 @@
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:text="@string/cast_you_are_casting" android:textColor="@color/overlay_content_secondary"
             android:textSize="18sp" android:gravity="center" />
-        <TextView android:id="@+id/castDeviceName" android:layout_width="wrap_content"
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/castDeviceName" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:layout_marginTop="8dp"
             android:textColor="@color/overlay_content" android:textSize="28sp" android:gravity="center"
-            android:maxLines="2" android:ellipsize="end" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:maxLines="2" android:ellipsize="end"
+            app:autoSizeTextType="uniform" app:autoSizeMinTextSize="14sp"
+            app:autoSizeMaxTextSize="28sp" app:autoSizeStepGranularity="1sp" />
+        <TextView android:id="@+id/castControlMessage" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="16dp" android:maxWidth="440dp" android:gravity="center"
             android:text="@string/cast_control_message" android:textColor="@color/overlay_content_secondary"
             android:textSize="16sp" />
@@ -311,6 +313,10 @@
                     style="@style/TimingSpinner"
                     android:contentDescription="@string/setting_transition_time" />
 
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/transition_random_description"
+                    android:textColor="@color/overlay_content_secondary" android:textSize="13sp" />
+
                 <TextView
                     style="@style/SettingLabel"
                     android:labelFor="@id/groupTransition"
@@ -334,34 +340,14 @@
 
                 <TextView
                     style="@style/SettingLabel"
-                    android:labelFor="@id/groupFrameRate"
+                    android:labelFor="@id/spinnerFrameRate"
                     android:text="@string/setting_frame_rate" />
 
-                <RadioGroup
-                    android:id="@+id/groupFrameRate"
-                    style="@style/SegmentedGroup">
-
-                    <RadioButton
-                        android:id="@+id/fps30"
-                        style="@style/Segment"
-                        android:text="@string/fps_30" />
-
-                    <RadioButton
-                        android:id="@+id/fps45"
-                        style="@style/Segment"
-                        android:text="@string/fps_45" />
-
-                    <RadioButton
-                        android:id="@+id/fps60"
-                        style="@style/Segment"
-                        android:text="@string/fps_60" />
-
-                    <RadioButton
-                        android:id="@+id/fpsMax"
-                        style="@style/Segment"
-                        android:text="@string/fps_max" />
-
-                </RadioGroup>
+                <Spinner android:id="@+id/spinnerFrameRate" style="@style/TimingSpinner"
+                    android:contentDescription="@string/setting_frame_rate" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/frame_rate_description" android:textSize="13sp"
+                    android:textColor="@color/overlay_content_secondary" />
 
                 <TextView
                     style="@style/SettingLabel"

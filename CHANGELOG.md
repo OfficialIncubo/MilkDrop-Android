@@ -6,6 +6,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- FPS choices of 24, 30, 45, 50, 60, 120 and Max (Unlimited), preserving saved frame rates.
+- Transition times of 2.5 and 3 seconds, plus Random: sample a duration from 0.5–5 seconds
+  per preset transition and use it consistently for the blend and its timer.
 - Wireless display / Miracast shortcut in the Cast picker and Settings. Detect connected
   presentation displays, including those paired in the phone's system picker, and restore
   visual-only output on returning to MilkDrop without a TV app. Keep manual Stop respected
@@ -27,6 +30,11 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Prefer connected route names over generic Cast Receiver display labels and autosize long
+  receiver names. Explain Google Cast's buffered delay in the casting status.
+- Request wireless-display disconnection through Android routing APIs on Stop cast. Verify
+  that the display disappeared and open system settings if firmware requires manual disconnect,
+  retaining the connection status until it actually ends.
 - Use an RGB casting texture compatible with alpha-less render surfaces, fixing invalid
   framebuffer copies that could leave the receiver gray. Synchronize shared casting
   textures in both directions, match shader varying precision,

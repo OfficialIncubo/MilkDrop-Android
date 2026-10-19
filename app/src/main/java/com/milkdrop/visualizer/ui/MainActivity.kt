@@ -59,6 +59,7 @@ import com.milkdrop.visualizer.render.GraphicsSupport
 import com.milkdrop.visualizer.settings.AppSettings
 import com.milkdrop.visualizer.settings.AudioTuning
 import com.milkdrop.visualizer.settings.PresetTiming
+import com.milkdrop.visualizer.settings.FrameRates
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
@@ -214,6 +215,12 @@ class MainActivity : AppCompatActivity() {
             updateCastButton()
             binding.castStatus.isVisible = state.casting && !receivingLive
             binding.castDeviceName.text = state.device
+            binding.castControlMessage.setText(when {
+                state.disconnecting && !state.connecting -> R.string.cast_finish_disconnect
+                state.buffered -> R.string.cast_control_message_buffered
+                else -> R.string.cast_control_message
+            })
+            binding.btnWirelessDisplay.setText(if (state.wireless) R.string.cast_wireless_disconnect else R.string.cast_wireless_settings)
         }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() })
         binding.btnCast.setOnClickListener { castingController?.chooseOrStop() }
         setupControlBar()
@@ -244,7 +251,7 @@ class MainActivity : AppCompatActivity() {
         configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
         configureTimingSpinner(binding.spinnerTransitionTime, R.array.transition_time_options, transitionTimeIndex)
         binding.groupTransition.check(if (hardCutEnabled) R.id.transitionInstant else R.id.transitionSmooth)
-        binding.groupFrameRate.check(FPS_BUTTON_IDS[fpsIndex])
+        configureTimingSpinner(binding.spinnerFrameRate, R.array.frame_rate_options, fpsIndex)
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
         binding.groupAudioSource.check(AUDIO_INPUT_BUTTON_IDS.getValue(settings.audioInput))
         binding.sliderAudioSensitivity.max = (AudioTuning.SENSITIVITY_MAX * 10).roundToInt()
@@ -274,7 +281,7 @@ class MainActivity : AppCompatActivity() {
         surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
         surfaceView.milkDropRenderer.fftShaderScaling = settings.fftShaderScaling
         surfaceView.milkDropRenderer.fftShaderNoiseFloor = settings.fftShaderNoiseFloor
-        surfaceView.targetFps = FPS_OPTIONS[fpsIndex]
+        applyFrameRate()
         applyQuality()
     }
 
@@ -424,6 +431,7 @@ class MainActivity : AppCompatActivity() {
             ViewCompat.requestApplyInsets(binding.root)
         }
         val label = when {
+            state.disconnecting && state.connecting -> R.string.cast_disconnecting
             state.connecting -> R.string.cast_connecting
             state.device != null -> R.string.cast_stop
             else -> R.string.cast_start
@@ -834,10 +842,10 @@ class MainActivity : AppCompatActivity() {
             settings.hardCutEnabled = hardCutEnabled
             surfaceView.milkDropRenderer.instantTransitions = hardCutEnabled
         }
-        binding.groupFrameRate.onUserSelection { id ->
-            fpsIndex = FPS_BUTTON_IDS.indexOf(id)
+        binding.spinnerFrameRate.onUserSelection { index ->
+            fpsIndex = index
             settings.fpsIndex = fpsIndex
-            surfaceView.targetFps = FPS_OPTIONS[fpsIndex]
+            applyFrameRate()
         }
         binding.groupQuality.onUserSelection { id ->
             qualityIndex = QUALITY_BUTTON_IDS.indexOf(id)
@@ -887,6 +895,22 @@ class MainActivity : AppCompatActivity() {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
         spinner.setSelection(index)
+    }
+
+    @Suppress("DEPRECATION") // The window display API is needed on Android 9.
+    private fun applyFrameRate() {
+        val fps = FrameRates.options[fpsIndex]
+        surfaceView.targetFps = fps
+        val display = surfaceView.display ?: windowManager.defaultDisplay
+        val mode = display.mode
+        val highest = display.supportedModes.filter {
+            it.physicalWidth == mode.physicalWidth && it.physicalHeight == mode.physicalHeight
+        }.maxOfOrNull { it.refreshRate } ?: mode.refreshRate
+        window.attributes = window.attributes.apply {
+            // Ask for high-refresh modes without changing screen resolution or slowing UI
+            // to 24/30 Hz. Android still makes the final choice based on device policy.
+            preferredRefreshRate = if (fps == 0) highest else if (fps > 60) fps.toFloat() else 0f
+        }
     }
 
     private fun Spinner.onUserSelection(action: (Int) -> Unit) {
@@ -1234,8 +1258,6 @@ class MainActivity : AppCompatActivity() {
         const val LANDSCAPE_SHEET_WIDTH_DP = 480
 
         // 0 = uncapped ("Max"). Index 0 (30fps) is the default performance-friendly setting.
-        val FPS_OPTIONS = intArrayOf(30, 45, 60, 0)
-        val FPS_BUTTON_IDS = intArrayOf(R.id.fps30, R.id.fps45, R.id.fps60, R.id.fpsMax)
 
         // Fraction of native resolution to render at; lower cuts fragment shader cost for heavy presets.
         val QUALITY_SCALES = floatArrayOf(1.0f, 0.75f, 0.5f)
