@@ -134,11 +134,12 @@ The app follows the phone's rotation; in landscape the controls are a single row
 
 ### Casting visuals
 
-A rounded **Cast** button appears at the upper right when a compatible display is discovered.
+A rounded **Cast** button appears at the upper right alongside the sidebar controls when a compatible display is discovered.
 Choose a TV or projector to send only the visuals. The phone shows the receiver's name and
 keeps preset controls, swipe gestures, the list and Settings available. **Stop cast** restores
 the visuals to the phone without restarting the preset.
-The button hides while Settings or the preset list is open and shows a spinner while connecting.
+The button hides with the sidebar and while Settings or the preset list is open. While connecting,
+its cast icon animates outward through the signal waves.
 
 - **MilkDrop Live (recommended for live visuals):** install this version of MilkDrop on an
   Android TV/projector and keep the TV app open. Connect both devices to the same local

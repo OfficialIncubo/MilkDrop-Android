@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.drawable.Animatable
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
@@ -74,6 +75,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settings: AppSettings
     private var castingController: CastingController? = null
     private var castState = CastingController.State(false)
+    private var castButtonIconResource = 0
     private var tvReceiver: DirectCastReceiver? = null
     private var receivingLive = false
     private var foreground = false
@@ -433,7 +435,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCastButton() {
         val state = castState
-        val visible = !receivingLive && !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible &&
+        val visible = binding.controlBar.isVisible && !receivingLive &&
+            !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible &&
             (state.available || state.device != null)
         if (binding.btnCast.isVisible != visible) {
             binding.btnCast.isVisible = visible
@@ -447,9 +450,21 @@ class MainActivity : AppCompatActivity() {
         }
         binding.castButtonText.setText(label)
         binding.btnCast.contentDescription = getString(label)
-        binding.castConnecting.isVisible = state.connecting
-        binding.castButtonIcon.isVisible = !state.connecting
-        binding.castButtonIcon.setImageResource(if (state.device != null) R.drawable.ic_cast_off else R.drawable.ic_cast)
+        val icon = when {
+            state.connecting -> R.drawable.ic_cast_pending
+            state.device != null -> R.drawable.ic_cast_off
+            else -> R.drawable.ic_cast
+        }
+        if (castButtonIconResource != icon) {
+            (binding.castButtonIcon.drawable as? Animatable)?.stop()
+            binding.castButtonIcon.setImageResource(icon)
+            castButtonIconResource = icon
+        }
+        (binding.castButtonIcon.drawable as? Animatable)?.let { animation ->
+            if (visible && foreground && state.connecting) {
+                if (!animation.isRunning) animation.start()
+            } else animation.stop()
+        }
     }
 
     private fun setupTvReceiver() {
@@ -666,6 +681,7 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         if (graphicsBlocked) return
         foreground = false
+        (binding.castButtonIcon.drawable as? Animatable)?.stop()
         tvReceiver?.stop()
         castingController?.pause()
         consumedRemoteKeys.clear()

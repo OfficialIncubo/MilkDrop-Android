@@ -30,6 +30,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Show Cast/Stop cast only alongside the sidebar controls, retaining the Settings/preset-list
+  visibility rules. Replace the connecting spinner with an animated cast signal icon and
+  stop its animation whenever the button is hidden or the app is paused.
 - Resolve Google Cast names from the active session and try the connected Wi-Fi Direct
   peer when a wireless display exposes only a generic label. Optional Nearby devices /
   Location access is requested only for that fallback, with bounded queries and cleanup.
@@ -52,7 +55,7 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
   framebuffer copies that could leave the receiver gray. Synchronize shared casting
   textures in both directions, match shader varying precision,
   preserve AVC parameter sets reported separately, and avoid skipping frames at 30 fps.
-- Hide Cast/Stop cast while Settings or the preset list is open; show a connecting spinner.
+- Hide Cast/Stop cast while Settings or the preset list is open; animate the cast icon while connecting.
 - Accept bare `randXX` texture calls alongside `sampler_randXX` names. Bind short
   random-texture aliases to the selected texture unit, retain each shader's sampler
   name and filter/wrap settings when reusing a random slot, and deduplicate shared
