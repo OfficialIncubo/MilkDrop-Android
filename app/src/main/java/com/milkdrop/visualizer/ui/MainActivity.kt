@@ -142,6 +142,11 @@ class MainActivity : AppCompatActivity() {
             startPersistedAudioSource()
         }
 
+    private val castNamePermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            castingController?.refreshReceiverName()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setImmersiveFullscreen()
@@ -221,7 +226,11 @@ class MainActivity : AppCompatActivity() {
                 else -> R.string.cast_control_message
             })
             binding.btnWirelessDisplay.setText(if (state.wireless) R.string.cast_wireless_disconnect else R.string.cast_wireless_settings)
-        }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() })
+        }, onError = { Toast.makeText(this, R.string.cast_failed, Toast.LENGTH_LONG).show() },
+            onNamePermissionNeeded = { permissions ->
+                Toast.makeText(this, R.string.cast_name_permission, Toast.LENGTH_LONG).show()
+                castNamePermissionsLauncher.launch(permissions)
+            })
         binding.btnCast.setOnClickListener { castingController?.chooseOrStop() }
         setupControlBar()
         setupSettingsSheet()

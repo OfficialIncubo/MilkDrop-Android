@@ -15,9 +15,11 @@ internal class VisualStreamEncoder(
     private val onReady: () -> Unit,
     private val onError: (Exception) -> Unit,
     private val direct: DirectVideoSender? = null,
+    requestedFramesPerSecond: Int = 60,
 ) : Closeable {
     val width: Int
     val height: Int
+    val framesPerSecond: Int
     private val codec: MediaCodec
     val surface: Surface
     private val running = AtomicBoolean(true)
@@ -28,22 +30,33 @@ internal class VisualStreamEncoder(
         var selected: MediaCodec? = null
         var selectedSurface: Surface? = null
         var size = 960 to 544
+        var selectedRate = 0
         var failure: Exception? = null
-        for ((w, h) in listOf(960 to 544, 640 to 368)) {
+        val attempts = listOf(960 to 544, 640 to 368).flatMap { (w, h) ->
+            listOf(requestedFramesPerSecond, minOf(requestedFramesPerSecond, 60), minOf(requestedFramesPerSecond, 30))
+                .distinct().map { fps -> Triple(w, h, fps) }
+        }
+        for ((w, h, requestedRate) in attempts) {
             val candidate = try { MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC) }
                 catch (e: Exception) { failure = e; continue }
             try {
+                val capabilities = checkNotNull(candidate.codecInfo
+                    .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC).videoCapabilities)
+                val rates = capabilities.getSupportedFrameRatesFor(w, h)
+                val fps = requestedRate.coerceIn(
+                    kotlin.math.ceil(rates.lower).toInt().coerceAtLeast(1),
+                    kotlin.math.floor(rates.upper).toInt().coerceAtLeast(1))
                 val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
                     setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-                    setInteger(MediaFormat.KEY_BIT_RATE, if (w > 640) 2_000_000 else 1_200_000)
-                    setInteger(MediaFormat.KEY_FRAME_RATE, 30)
-                    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+                    setInteger(MediaFormat.KEY_BIT_RATE, (if (w > 640) 2_000_000 else 1_200_000) * fps / 30)
+                    setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+                    setFloat(MediaFormat.KEY_I_FRAME_INTERVAL, CastVideoTiming.KEY_FRAME_SECONDS)
                     setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
                 }
                 candidate.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 selectedSurface = candidate.createInputSurface()
                 candidate.start()
-                selected = candidate; size = w to h
+                selected = candidate; size = w to h; selectedRate = fps
                 break
             } catch (e: Exception) {
                 failure = e
@@ -54,6 +67,7 @@ internal class VisualStreamEncoder(
         codec = selected ?: throw IllegalStateException("No compatible AVC surface encoder", failure)
         surface = checkNotNull(selectedSurface)
         width = size.first; height = size.second
+        framesPerSecond = selectedRate
         direct?.requestKeyFrame = { syncRequested.set(true) }
         drainThread = Thread(::drain, "MilkDrop-cast-encoder").apply { isDaemon = true; start() }
     }
@@ -69,6 +83,8 @@ internal class VisualStreamEncoder(
         var nextDiscontinuity = false
         var ready = false
         var lastKeyRequest = 0L
+        val frameDurationUs = 1_000_000L / framesPerSecond
+        val maxSegmentUs = CastVideoTiming.TARGET_SEGMENT_SECONDS * 1_000_000L
         fun publish(duration: Double) {
             val available = server?.publish(muxer.bytes(), duration.coerceAtLeast(0.001), discontinuity) == true
             if (available && !ready) { ready = true; onReady() }
@@ -108,15 +124,16 @@ internal class VisualStreamEncoder(
                         // A slow preset load can leave a gap. End the old segment before the
                         // gap and restart at a key frame with an explicit HLS discontinuity.
                         if (segmentStart >= 0 && previousTime >= 0 && timeUs - previousTime > 500_000) {
-                            publish((previousTime - segmentStart + 33_333) / 1_000_000.0)
+                            publish((previousTime - segmentStart + frameDurationUs).coerceAtMost(maxSegmentUs) / 1_000_000.0)
                             segmentStart = -1; nextDiscontinuity = true
                         }
                         if (segmentStart < 0 && !key) { requestKeyFrame(); continue }
-                        if (segmentStart >= 0 && timeUs - segmentStart > 1_500_000 && !key) {
-                            publish((previousTime - segmentStart + 33_333).coerceAtMost(2_000_000) / 1_000_000.0)
+                        if (segmentStart >= 0 && timeUs - segmentStart > maxSegmentUs) {
+                            publish((previousTime - segmentStart + frameDurationUs).coerceAtMost(maxSegmentUs) / 1_000_000.0)
                             segmentStart = -1; nextDiscontinuity = true
-                            requestKeyFrame(); continue
+                            if (!key) { requestKeyFrame(); continue }
                         }
+                        if (segmentStart >= 0 && !key && timeUs - segmentStart >= 450_000) requestKeyFrame()
                         if (key) {
                             if (segmentStart >= 0) {
                                 publish((timeUs - segmentStart) / 1_000_000.0)

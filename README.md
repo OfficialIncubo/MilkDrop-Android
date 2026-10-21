@@ -151,10 +151,12 @@ The button hides while Settings or the preset list is open and shows a spinner w
   only while the TV app is in the foreground. Android 9 remains supported.
 - **Google Cast / Chromecast / Google TV:** requires Google Play services and a receiver on
   the same reachable Wi-Fi or Ethernet network. The phone serves a session-only H.264 live
-  stream; receiver buffering adds several seconds of delay. The app advertises a short
+  stream with a one-second segment target and roughly three seconds of startup video;
+  receiver buffering still adds delay. The app advertises a short
   live window and requests live playback if the receiver reports excessive drift; this
   does not eliminate the receiver's own buffer. Guest networks that isolate
-  devices can prevent playback.
+  devices can prevent playback. The Default Media Receiver controls its startup logo;
+  replacing that screen and playback pipeline requires a registered, hosted custom receiver.
 - **Miracast / Wireless Display and external displays:** supported when Android exposes the
   display as a video route or connected presentation display. Use **Wireless display / Miracast…**
   in the Cast picker or MilkDrop Settings to open the phone's system picker (or connection
@@ -169,12 +171,22 @@ The button hides while Settings or the preset list is open and shows a spinner w
   so you can finish disconnecting, and keeps reporting the connection until it ends. The system
   three-dot Wireless display toggle and its wording belong to Android Settings; MilkDrop cannot
   rename it or directly enable/disable that protected system setting.
+  Receiver names come from the selected route/display or, when available, the connected
+  Wi-Fi Direct peer. If Android hides the name, MilkDrop may ask for optional Nearby devices
+  access (Android 13+) or Location access (Android 9–12) to identify that existing connection.
+  Declining keeps casting available; unavailable or ambiguous names remain generic.
+
+Casting follows the selected frame rate within the encoder and receiver's supported limits.
+There is no fixed 30 FPS casting limit: presentation displays use rendered frames directly,
+Google Cast video supports up to 60 FPS, and MilkDrop Live negotiates the phone encoder's rate.
+Older encoders can fall back to lower frame rates or resolution. Max remains limited by the
+display, encoder and receiver hardware; wireless transport cannot guarantee zero latency.
 
 MilkDrop streams its visual framebuffer; its network video streams carry no audio or app UI.
 Android manages audio routing and whole-screen mirroring for system wireless displays.
 Existing audio modes keep feeding projectM. Casting runs only while MilkDrop is in the foreground and stops on
 app pause, disconnection or failure; the phone then resumes local visuals. Network video
-encoding is capped at 960×544 at 30 fps, with a 640×368 fallback, to limit work on older
+encoding uses up to 960×544 with negotiated frame rates and a 640×368 fallback for older
 devices. Android 9 remains the minimum supported version. Device discovery and playback
 still need verification on physical receivers; a compatible receiver must advertise a service or route
 before the Cast button can appear.
@@ -212,8 +224,8 @@ Preset equation variables `aspectx` and `aspecty` also become `1.0` in screen-de
   to the next blend, preserving any blend already in progress.
 - **Transition** — Smooth blends using Transition time; Instant cuts straight to the next preset.
 - **Frame rate** — 24, 30, 45, 50, 60, 120 or Max (Unlimited). Max removes the app's cap;
-  rendering still follows display refresh and device performance. Casting video remains capped
-  at 30 FPS. Existing saved FPS choices are preserved when updating.
+  rendering still follows display refresh and device performance. Network casting also follows
+  negotiated encoder/receiver limits. Existing saved FPS choices are preserved when updating.
 - **Quality** — render resolution (High / Medium / Low). Low also uses a coarser warp mesh.
 - **Screen-Dependent Render Mode** — fit custom waves, shapes, built-in waves, and per-vertex
   motion to full-screen coordinates, following BeatDrop's screen-dependent convention. Off by

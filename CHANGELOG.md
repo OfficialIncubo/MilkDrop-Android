@@ -30,9 +30,17 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Resolve Google Cast names from the active session and try the connected Wi-Fi Direct
+  peer when a wireless display exposes only a generic label. Optional Nearby devices /
+  Location access is requested only for that fallback, with bounded queries and cleanup.
+- Remove the fixed 30 FPS casting cap. Follow the selected frame rate within negotiated
+  encoder limits, support up to 60 FPS for Google Cast video, and keep older encoder fallbacks.
+- Shorten HLS segments to a one-second target and startup/live windows to about three seconds.
+  Request fresh key frames and recover from encoder/preset stalls without oversized segments.
+  The default Google receiver's startup screen and playback buffer remain receiver-controlled.
 - Exclude the phone's localized local route label (including Telefon) when resolving a
   wireless receiver name. Use the connected TV/projector name when Android exposes it.
-- Limit the advertised Google Cast live playlist to about six seconds while retaining
+- Limit the advertised Google Cast live playlist to about three seconds while retaining
   older segments for pending requests. Seek back to live playback when reported lag
   exceeds eight seconds, with a cooldown to prevent repeated seeks on slow receivers.
 - Prefer connected route names over generic Cast Receiver display labels and autosize long

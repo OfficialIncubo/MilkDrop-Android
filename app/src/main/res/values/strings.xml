@@ -9,6 +9,7 @@
     <string name="cast_wireless_disconnect">Disconnect wireless display…</string>
     <string name="cast_finish_disconnect">The display is still connected. Disconnect it in your phone’s connection settings to stop sharing.</string>
     <string name="cast_wireless_device">Wireless display</string>
+    <string name="cast_name_permission">Optional: allow Nearby devices or Location access to identify your connected TV or projector. Casting still works without it.</string>
     <string name="cast_control_message_buffered">Your visuals are playing on your TV or projector. Google Cast video may be several seconds behind. Control presets and settings from this device.</string>
     <string name="cast_choose_device">Cast to</string>
     <string name="cast_wireless_settings">Wireless display / Miracast…</string>

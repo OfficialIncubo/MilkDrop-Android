@@ -34,6 +34,8 @@ class VisualOutput(
     private var displayInitialized = false
     private var consumerFence = 0L
     @Volatile private var dimensions = width to height
+    /** 0 follows every rendered frame; encoders may supply their negotiated hardware limit. */
+    @Volatile var maxFramesPerSecond: Int = 0
 
     fun resize(width: Int, height: Int) {
         if (width > 0 && height > 0) dimensions = width to height
@@ -44,7 +46,7 @@ class VisualOutput(
         val (width, height) = dimensions
         val now = System.nanoTime()
         if (closed || now + 2_000_000 < nextFrame || w <= 0 || h <= 0) return
-        val interval = 1_000_000_000L / 30
+        val interval = maxFramesPerSecond.takeIf { it > 0 }?.let { 1_000_000_000L / it } ?: 0L
         nextFrame = if (nextFrame == 0L || now - nextFrame > interval) now + interval else nextFrame + interval
         val oldDisplay = EGL14.eglGetCurrentDisplay()
         val oldContext = EGL14.eglGetCurrentContext()

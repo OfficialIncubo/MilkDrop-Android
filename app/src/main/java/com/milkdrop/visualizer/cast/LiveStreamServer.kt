@@ -40,14 +40,14 @@ internal class LiveStreamServer : Closeable {
 
     @Synchronized fun publish(bytes: ByteArray, duration: Double, discontinuity: Boolean = false): Boolean {
         if (closed || bytes.isEmpty() || bytes.size > MAX_BYTES) return false
-        require(duration > 0 && duration <= 2.0) { "Video segment exceeds its target duration" }
+        require(duration > 0 && duration <= CastVideoTiming.TARGET_SEGMENT_SECONDS) { "Video segment exceeds its target duration" }
         segments.addLast(Segment(sequence++, duration, bytes, discontinuity))
         storedBytes += bytes.size
         while (segments.size > 12 || storedBytes > MAX_BYTES) {
             val removed = segments.removeFirst(); storedBytes -= removed.data.size
             if (removed.discontinuity) discontinuitiesRemoved++
         }
-        return segments.sumOf { it.duration } >= 6.0
+        return segments.sumOf { it.duration } >= CastVideoTiming.LIVE_WINDOW_SECONDS
     }
 
     private fun serve(client: Socket) {
@@ -76,13 +76,13 @@ internal class LiveStreamServer : Closeable {
                             for (segment in segments.reversed()) {
                                 live.addFirst(segment)
                                 duration += segment.duration
-                                if (duration >= 6.0) break
+                                if (duration >= CastVideoTiming.LIVE_WINDOW_SECONDS) break
                             }
                             val discontinuities = discontinuitiesRemoved +
                                 segments.takeWhile { it.number < live.first().number }.count { it.discontinuity }
                             val list = buildString {
                                 append("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-INDEPENDENT-SEGMENTS\n")
-                                append("#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:${live.first().number}\n")
+                                append("#EXT-X-TARGETDURATION:${CastVideoTiming.TARGET_SEGMENT_SECONDS}\n#EXT-X-MEDIA-SEQUENCE:${live.first().number}\n")
                                 append("#EXT-X-DISCONTINUITY-SEQUENCE:$discontinuities\n")
                                 for (segment in live) {
                                     if (segment.discontinuity) append("#EXT-X-DISCONTINUITY\n")

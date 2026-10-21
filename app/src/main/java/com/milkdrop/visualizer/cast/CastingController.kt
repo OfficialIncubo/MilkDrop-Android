@@ -47,6 +47,7 @@ class CastingController(
     private val renderer: MilkDropSurfaceView,
     private val onState: (State) -> Unit,
     private val onError: () -> Unit,
+    private val onNamePermissionNeeded: (Array<String>) -> Unit = {},
 ) : Closeable {
     data class State(val available: Boolean, val device: String? = null,
         val connecting: Boolean = false, val casting: Boolean = false,
@@ -57,6 +58,12 @@ class CastingController(
     private val router = MediaRouter.getInstance(context)
     private val displays = context.getSystemService(DisplayManager::class.java)
     private val systemRoutes = SystemDisplayRoutes(context)
+    private val connectedPeer = ConnectedDisplayPeer(context)
+    private var peerName: Pair<Int, String>? = null
+    private var peerQueryActive = false
+    private var peerQueryAttempts = 0
+    private var namePermissionRequested = false
+    private val retryPeerName = Runnable { resolvePeerName() }
     private data class PendingDisconnect(val displayId: Int, val name: String, var prompted: Boolean = false)
     private var pendingDisconnect: PendingDisconnect? = null
     private val checkDisconnect = Runnable { verifyDisconnect(prompt = true) }
@@ -295,6 +302,41 @@ class CastingController(
         onState(State(started && receivers.isNotEmpty(), ending?.name ?: device,
             connecting || ending?.let { !it.prompted } == true, casting || ending != null, ending != null,
             presentation != null || ending != null, session != null))
+        resolvePeerName()
+    }
+
+    /** Retry after an optional Nearby devices / Location permission result. */
+    fun refreshReceiverName() {
+        peerQueryAttempts = 0
+        refresh()
+    }
+
+    private fun resolvePeerName() {
+        val display = presentation?.display ?: return
+        if (!started || pendingDisconnect != null || peerQueryActive || peerQueryAttempts >= 3 ||
+            displayName(display) != context.getString(R.string.cast_wireless_device)) return
+        val missing = connectedPeer.missingPermissions()
+        if (missing.isNotEmpty()) {
+            if (!namePermissionRequested) {
+                namePermissionRequested = true
+                main.post {
+                    if (started && presentation != null) onNamePermissionNeeded(missing)
+                    else namePermissionRequested = false
+                }
+            }
+            return
+        }
+        peerQueryActive = true
+        peerQueryAttempts++
+        val id = generation
+        connectedPeer.query { name ->
+            if (id != generation || presentation?.display?.displayId != display.displayId) return@query
+            peerQueryActive = false
+            if (name != null) {
+                peerName = display.displayId to name
+                refresh()
+            } else if (peerQueryAttempts < 3) main.postDelayed(retryPeerName, 2_000)
+        }
     }
 
     private fun displayName(display: Display): String {
@@ -302,7 +344,8 @@ class CastingController(
             it.presentationDisplay?.displayId == display.displayId }.map { it.name }
         val localNames = systemRoutes.localNames() + router.routes.filter { it.isDefault }.map { it.name } +
             listOf(displays.getDisplay(Display.DEFAULT_DISPLAY)?.name)
-        return ReceiverNames.choose(routeNames + systemRoutes.names(display) + listOf(display.name, device),
+        return ReceiverNames.choose(routeNames + systemRoutes.names(display) +
+            listOf(peerName?.takeIf { it.first == display.displayId }?.second, display.name, device),
             context.getString(R.string.cast_wireless_device), localNames)
     }
 
@@ -378,8 +421,11 @@ class CastingController(
     private fun startGoogleStream(s: CastSession) {
         if (!started || closed || directSender != null || streamStarting || session === s) return
         if (device == null) { castContext?.sessionManager?.endCurrentSession(true); return }
+        s.castDevice?.friendlyName?.takeIf { it.isNotBlank() }?.let { device = it }
         session = s; streamStarting = true
         val id = generation
+        // Standard Cast video receivers support up to 60 fps; the codec can negotiate lower.
+        val frameRate = encodingFrameRate().coerceAtMost(60)
         worker.execute {
             var pendingServer: LiveStreamServer? = null
             var pendingEncoder: VisualStreamEncoder? = null
@@ -389,7 +435,7 @@ class CastingController(
                 val stream = pendingServer
                 pendingEncoder = VisualStreamEncoder(stream, onReady = {
                     main.post { if (id == generation && session === s && started) loadStream(s, stream.url(address), id) }
-                }, onError = { error -> main.post { fail(id, error) } })
+                }, onError = { error -> main.post { fail(id, error) } }, requestedFramesPerSecond = frameRate)
                 val video = pendingEncoder
                 main.post {
                     if (id != generation || !started || closed) {
@@ -397,7 +443,8 @@ class CastingController(
                     } else {
                         encoder = video; server = stream; streamStarting = false
                         installOutput(VisualOutput(video.surface, video.width, video.height, true,
-                            { error -> main.post { fail(id, error) } }), video.width to video.height)
+                            { error -> main.post { fail(id, error) } }).apply { maxFramesPerSecond = video.framesPerSecond },
+                            video.width to video.height)
                     }
                 }
             } catch (e: Exception) {
@@ -410,6 +457,7 @@ class CastingController(
     private fun startDirectStream(target: DirectCastDevice) {
         begin(target.name)
         val id = generation
+        val frameRate = encodingFrameRate()
         val sender = DirectVideoSender(onPresented = {
             main.post { if (id == generation && started && device != null) {
                 connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
@@ -422,7 +470,7 @@ class CastingController(
             try {
                 sender.connect(target, "${Build.MANUFACTURER} ${Build.MODEL}".trim())
                 video = VisualStreamEncoder(onReady = {},
-                    onError = { error -> main.post { fail(id, error) } }, direct = sender)
+                    onError = { error -> main.post { fail(id, error) } }, direct = sender, requestedFramesPerSecond = frameRate)
                 val pending = video
                 main.post {
                     if (id != generation || !started || closed) {
@@ -430,7 +478,8 @@ class CastingController(
                     } else {
                         encoder = pending
                         installOutput(VisualOutput(pending.surface, pending.width, pending.height, true,
-                            { error -> main.post { fail(id, error) } }), pending.width to pending.height)
+                            { error -> main.post { fail(id, error) } }).apply { maxFramesPerSecond = pending.framesPerSecond },
+                            pending.width to pending.height)
                     }
                 }
             } catch (e: Exception) {
@@ -460,14 +509,20 @@ class CastingController(
     private fun installOutput(destination: VisualOutput, size: Pair<Int, Int>) {
         val old = output
         output = destination; renderer.milkDropRenderer.visualOutput = destination
-        renderer.setCastSize(size)
+        renderer.setCastSize(size, destination.maxFramesPerSecond)
         if (old != null) cleanup(old, null, null)
     }
+
+    private fun encodingFrameRate(): Int = maxOf(renderer.targetFps,
+        renderer.display?.supportedModes?.maxOfOrNull { kotlin.math.ceil(it.refreshRate.toDouble()).toInt() } ?: 60)
 
     fun stop(selectLocal: Boolean = true, suppressDisplay: Boolean = true) {
         generation++
         main.removeCallbacks(timeout)
         main.removeCallbacks(checkLivePosition)
+        main.removeCallbacks(retryPeerName)
+        connectedPeer.close()
+        peerName = null; peerQueryActive = false; peerQueryAttempts = 0
         val oldOutput = output; val oldEncoder = encoder; val oldServer = server
         renderer.milkDropRenderer.visualOutput = null; renderer.setCastSize(null)
         output = null; encoder = null; server = null; streamStarting = false

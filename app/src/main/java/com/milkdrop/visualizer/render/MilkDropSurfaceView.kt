@@ -33,10 +33,12 @@ class MilkDropSurfaceView(
     private var pacing = false
     private var resolutionScale = 1f
     private var castSize: Pair<Int, Int>? = null
+    private var castFrameRateLimit = 0
 
     /** Keep the render buffer landscape while the phone displays its casting controls. */
-    fun setCastSize(size: Pair<Int, Int>?) {
+    fun setCastSize(size: Pair<Int, Int>?, frameRateLimit: Int = 0) {
         castSize = size
+        castFrameRateLimit = if (size == null) 0 else frameRateLimit.coerceAtLeast(0)
         nextRenderNanos = 0L
         val displayHz = display?.refreshRate?.takeIf { it > 0f } ?: DEFAULT_REFRESH_HZ
         performanceHints.setTargetFrameNanos(effectiveFrameInterval().takeIf { it > 0L }
@@ -44,8 +46,8 @@ class MilkDropSurfaceView(
         post { applyResolutionScale() }
     }
 
-    private fun effectiveFrameInterval() = if (castSize != null)
-        maxOf(frameIntervalNanos, 1_000_000_000L / 30) else frameIntervalNanos
+    private fun effectiveFrameInterval() = if (castFrameRateLimit > 0)
+        maxOf(frameIntervalNanos, 1_000_000_000L / castFrameRateLimit) else frameIntervalNanos
 
     /**
      * Frame pacing is driven by vsync instead of sleeping on the GL thread. Sleeping after each
