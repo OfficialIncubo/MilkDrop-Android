@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.SurfaceHolder
@@ -29,6 +30,7 @@ import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.MediaStatus
+import com.google.android.gms.cast.MediaSeekOptions
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
@@ -77,6 +79,22 @@ class CastingController(
     private var streamStarting = false
     private var session: CastSession? = null
     private var mediaClient: RemoteMediaClient? = null
+    private var lastLiveSeek = 0L
+    private val checkLivePosition = object : Runnable {
+        override fun run() {
+            val client = mediaClient ?: return
+            val status = client.mediaStatus
+            val now = SystemClock.elapsedRealtime()
+            // Leave the player's normal safety buffer alone; only recover excessive drift.
+            if (client.playerState == MediaStatus.PLAYER_STATE_PLAYING && status?.liveSeekableRange != null &&
+                client.approximateLiveSeekableRangeEnd - client.approximateStreamPosition > 8_000 &&
+                now - lastLiveSeek >= 30_000) {
+                lastLiveSeek = now
+                client.seek(MediaSeekOptions.Builder().setIsSeekToInfinite(true).build())
+            }
+            main.postDelayed(this, 2_000)
+        }
+    }
     private var chooser: AlertDialog? = null
     private var chooserAdapter: ArrayAdapter<String>? = null
     private sealed class Choice(val name: String) {
@@ -280,9 +298,12 @@ class CastingController(
     }
 
     private fun displayName(display: Display): String {
-        val routeNames = router.routes.filter { it.presentationDisplay?.displayId == display.displayId }.map { it.name }
+        val routeNames = router.routes.filter { !it.isDefault && !it.isBluetooth &&
+            it.presentationDisplay?.displayId == display.displayId }.map { it.name }
+        val localNames = systemRoutes.localNames() + router.routes.filter { it.isDefault }.map { it.name } +
+            listOf(displays.getDisplay(Display.DEFAULT_DISPLAY)?.name)
         return ReceiverNames.choose(routeNames + systemRoutes.names(display) + listOf(display.name, device),
-            context.getString(R.string.cast_wireless_device))
+            context.getString(R.string.cast_wireless_device), localNames)
     }
 
     private fun connectedDisplays() = displays.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
@@ -422,6 +443,9 @@ class CastingController(
     private fun loadStream(s: CastSession, url: String, id: Int) {
         val client = s.remoteMediaClient ?: return fail(id, IllegalStateException("No receiver player"))
         mediaClient = client; client.registerCallback(mediaEvents)
+        lastLiveSeek = SystemClock.elapsedRealtime() - 30_000
+        main.removeCallbacks(checkLivePosition)
+        main.postDelayed(checkLivePosition, 2_000)
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, context.getString(R.string.app_name))
         }
@@ -443,6 +467,7 @@ class CastingController(
     fun stop(selectLocal: Boolean = true, suppressDisplay: Boolean = true) {
         generation++
         main.removeCallbacks(timeout)
+        main.removeCallbacks(checkLivePosition)
         val oldOutput = output; val oldEncoder = encoder; val oldServer = server
         renderer.milkDropRenderer.visualOutput = null; renderer.setCastSize(null)
         output = null; encoder = null; server = null; streamStarting = false

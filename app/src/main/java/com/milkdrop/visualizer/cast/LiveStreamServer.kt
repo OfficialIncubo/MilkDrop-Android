@@ -69,11 +69,22 @@ internal class LiveStreamServer : Closeable {
                 val response = synchronized(this) {
                     when {
                         path == "/$token/live.m3u8" && segments.isNotEmpty() -> {
+                            // Keep older segments available for in-flight requests, but never
+                            // advertise the entire retained cache as a playback backlog.
+                            val live = ArrayDeque<Segment>()
+                            var duration = 0.0
+                            for (segment in segments.reversed()) {
+                                live.addFirst(segment)
+                                duration += segment.duration
+                                if (duration >= 6.0) break
+                            }
+                            val discontinuities = discontinuitiesRemoved +
+                                segments.takeWhile { it.number < live.first().number }.count { it.discontinuity }
                             val list = buildString {
                                 append("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-INDEPENDENT-SEGMENTS\n")
-                                append("#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:${segments.first().number}\n")
-                                append("#EXT-X-DISCONTINUITY-SEQUENCE:$discontinuitiesRemoved\n")
-                                for (segment in segments) {
+                                append("#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:${live.first().number}\n")
+                                append("#EXT-X-DISCONTINUITY-SEQUENCE:$discontinuities\n")
+                                for (segment in live) {
                                     if (segment.discontinuity) append("#EXT-X-DISCONTINUITY\n")
                                     append(String.format(Locale.US, "#EXTINF:%.3f,\n%d.ts\n", segment.duration, segment.number))
                                 }

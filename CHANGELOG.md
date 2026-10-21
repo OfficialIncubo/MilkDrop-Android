@@ -30,6 +30,11 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Exclude the phone's localized local route label (including Telefon) when resolving a
+  wireless receiver name. Use the connected TV/projector name when Android exposes it.
+- Limit the advertised Google Cast live playlist to about six seconds while retaining
+  older segments for pending requests. Seek back to live playback when reported lag
+  exceeds eight seconds, with a cooldown to prevent repeated seeks on slow receivers.
 - Prefer connected route names over generic Cast Receiver display labels and autosize long
   receiver names. Explain Google Cast's buffered delay in the casting status.
 - Request wireless-display disconnection through Android routing APIs on Stop cast. Verify
