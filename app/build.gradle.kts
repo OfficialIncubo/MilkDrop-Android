@@ -1,3 +1,5 @@
+import java.io.File as JavaFile
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,7 +19,7 @@ val projectmCommit = runCatching {
         isIgnoreExitValue = true
     }.standardOutput.asText.get().trim().lines()
     // An exported engine directory inside this Git repository must not report the app's SHA.
-    if (revision.firstOrNull()?.let { java.io.File(it).canonicalFile } != projectmSource.asFile.canonicalFile) null
+    if (revision.firstOrNull()?.let { JavaFile(it).canonicalFile } != projectmSource.asFile.canonicalFile) null
     else revision.getOrNull(1)?.takeIf { it.matches(Regex("(?:[0-9a-f]{40}|[0-9a-f]{64})")) }
 }.getOrNull() ?: "Unknown"
 
