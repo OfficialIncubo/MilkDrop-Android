@@ -472,6 +472,59 @@
                     android:textColor="@color/overlay_content_secondary"
                     android:textSize="13sp" />
 
+                <LinearLayout
+                    android:id="@+id/engineInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:layout_marginBottom="16dp"
+                    android:padding="12dp"
+                    android:orientation="vertical"
+                    android:focusable="true"
+                    android:background="@drawable/remote_focus_background">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/engine_info_title"
+                        android:textColor="@color/overlay_content"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/engineLiveInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/overlay_content"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/engine_patch_info"
+                        android:textColor="@color/overlay_content_secondary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/engineUpstreamInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:fontFamily="monospace"
+                        android:breakStrategy="simple"
+                        android:textColor="@color/overlay_content_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/engine_snapshot_description"
+                        android:textColor="@color/overlay_content_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
             </LinearLayout>
 
         </ScrollView>

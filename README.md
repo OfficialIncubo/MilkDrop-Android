@@ -251,6 +251,12 @@ and resumes automatically when you return. Your selected audio mode is saved acr
 
 Settings and the preset list use the same translucent background as the sidebar.
 
+The bottom of Settings includes **Engine information**, with measured renderer FPS updated
+once per second, a summary of MilkDrop's projectM patches, and the upstream master version
+and full commit recorded for this APK. These identify the source actually built, rather than
+a newer upstream revision that the installed app does not contain. FPS describes the local
+renderer; it does not measure a casting receiver's playback rate.
+
 The app requires Android 9 (API 28) or newer and a GPU with working OpenGL ES 3.0 support.
 The unified APK includes 32-bit and 64-bit ARM and x86 builds. Devices that report low RAM
 start with Low quality unless a quality setting has already been saved.

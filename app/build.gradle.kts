@@ -3,6 +3,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Record the upstream source actually compiled, including CI's latest-master checkout.
+// No network lookup at runtime: a newer upstream commit must not misidentify this APK.
+val projectmSource = rootProject.layout.projectDirectory.dir("native/projectm")
+val projectmVersion = providers.fileContents(projectmSource.file("CMakeLists.txt")).asText.map { source ->
+    Regex("""project\(\s*libprojectM\b[\s\S]*?\bVERSION\s+(\d+\.\d+\.\d+)""")
+        .find(source)?.groupValues?.get(1) ?: "Unknown"
+}.get()
+val projectmCommit = runCatching {
+    val revision = providers.exec {
+        workingDir(projectmSource.asFile)
+        commandLine("git", "rev-parse", "--show-toplevel", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().lines()
+    // An exported engine directory inside this Git repository must not report the app's SHA.
+    if (revision.firstOrNull()?.let { java.io.File(it).canonicalFile } != projectmSource.asFile.canonicalFile) null
+    else revision.getOrNull(1)?.takeIf { it.matches(Regex("(?:[0-9a-f]{40}|[0-9a-f]{64})")) }
+}.getOrNull() ?: "Unknown"
+
 android {
     namespace = "com.milkdrop.visualizer"
     compileSdk = 35
@@ -14,6 +32,8 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "2.0.0"
+        buildConfigField("String", "PROJECTM_VERSION", "\"$projectmVersion\"")
+        buildConfigField("String", "PROJECTM_COMMIT", "\"$projectmCommit\"")
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -58,6 +78,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 

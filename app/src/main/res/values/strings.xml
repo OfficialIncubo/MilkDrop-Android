@@ -1,4 +1,11 @@
 <resources>
+    <string name="engine_info_title">Engine information</string>
+    <string name="engine_fps_value">%1$d FPS</string>
+    <string name="engine_fps_measuring">Measuring FPS…</string>
+    <string name="engine_live_info">%1$s ◉ projectM %2$s with MilkDrop patches</string>
+    <string name="engine_patch_info">Customized for MilkDrop with BeatDrop-compatible FFT and waveform shader functions, date/time and touch-pointer variables, shader and texture compatibility fixes, motion-vector corrections, preset timing controls, and rendering optimizations.</string>
+    <string name="engine_upstream_info">Upstream master version: %1$s ◉ Commit:\n%2$s</string>
+    <string name="engine_snapshot_description">The version and full commit identify the upstream source used to build this APK. FPS measures the local visualizer renderer, not the receiving TV. The installed engine does not update automatically.</string>
     <string name="cast_start">Cast</string>
     <string name="cast_live_device">%1$s (MilkDrop Live)</string>
     <string name="cast_receiving">Receiving visuals…</string>

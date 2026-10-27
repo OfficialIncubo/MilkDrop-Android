@@ -189,6 +189,12 @@ class MilkDropRenderer(
 
     private val frameRateMeter = FrameRateMeter()
     private var reportedFps = 0
+    @Volatile private var frameRateReading: Pair<Int, Long>? = null
+
+    /** Measured render FPS, rather than the configured cap; stale readings show a stopped renderer. */
+    fun currentFramesPerSecond(): Int? = frameRateReading?.let { (fps, sampledAt) ->
+        if (System.nanoTime() - sampledAt > 1_500_000_000L) 0 else fps
+    }
 
     /** Guards [handle] against being destroyed while the audio thread is mid-[feedPcm]. */
     private val pcmLock = Any()
@@ -272,6 +278,7 @@ class MilkDropRenderer(
      */
     private fun reportFrameRate(nowNanos: Long) {
         val fps = frameRateMeter.onFrame(nowNanos) ?: return
+        frameRateReading = fps to nowNanos
         if (fps != reportedFps && handle != 0L) {
             ProjectMBridge.nativeSetFps(handle, fps)
             reportedFps = fps
@@ -417,6 +424,7 @@ class MilkDropRenderer(
 
     /** Must run on the GL thread. */
     fun release() {
+        frameRateReading = null
         performanceHints.release()
         val currentHandle = handle
         if (currentHandle != 0L) {

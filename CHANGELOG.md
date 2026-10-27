@@ -6,6 +6,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Engine information at the bottom of Settings, separated from the controls: live measured
+  renderer FPS, patched projectM engine details, upstream version and the full commit used
+  for the build. Refresh FPS only while Settings is visible and the app is in the foreground.
 - FPS choices of 24, 30, 45, 50, 60, 120 and Max (Unlimited), preserving saved frame rates.
 - Transition times of 2.5 and 3 seconds, plus Random: sample a duration from 0.5–5 seconds
   per preset transition and use it consistently for the blend and its timer.

@@ -43,6 +43,7 @@ import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.milkdrop.visualizer.R
+import com.milkdrop.visualizer.BuildConfig
 import com.milkdrop.visualizer.audio.AudioCaptureManager
 import com.milkdrop.visualizer.audio.AudioInput
 import com.milkdrop.visualizer.cast.CastingController
@@ -79,6 +80,16 @@ class MainActivity : AppCompatActivity() {
     private var tvReceiver: DirectCastReceiver? = null
     private var receivingLive = false
     private var foreground = false
+    private val refreshSettingsInfo = object : Runnable {
+        override fun run() {
+            if (!foreground || !binding.settingsSheet.isVisible) return
+            val fps = surfaceView.milkDropRenderer.currentFramesPerSecond()
+            val measured = fps?.let { getString(R.string.engine_fps_value, it) }
+                ?: getString(R.string.engine_fps_measuring)
+            binding.engineLiveInfo.text = getString(R.string.engine_live_info, measured, BuildConfig.PROJECTM_VERSION)
+            binding.engineLiveInfo.postDelayed(this, 1_000)
+        }
+    }
     private var resumeAudioAfterReceiver = false
     private val stopReceiverOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() { tvReceiver?.stopStream() }
@@ -596,6 +607,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (graphicsBlocked) return
         foreground = true
+        binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
+        if (binding.settingsSheet.isVisible) refreshSettingsInfo.run()
         surfaceView.onResume()
         castingController?.start()
         tvReceiver?.start()
@@ -681,6 +694,7 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         if (graphicsBlocked) return
         foreground = false
+        binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
         (binding.castButtonIcon.drawable as? Animatable)?.stop()
         tvReceiver?.stop()
         castingController?.pause()
@@ -705,6 +719,7 @@ class MainActivity : AppCompatActivity() {
             audioCaptureManager.stopAll()
         }
         if (::binding.isInitialized) {
+            binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
             binding.playlistSearch.removeCallbacks(pendingSearch)
             binding.presetStatus.removeCallbacks(hidePresetName)
         }
@@ -957,6 +972,10 @@ class MainActivity : AppCompatActivity() {
     private fun openSettingsSheet() {
         binding.controlBar.isVisible = false
         binding.settingsSheet.isVisible = true
+        binding.engineUpstreamInfo.text = getString(R.string.engine_upstream_info,
+            BuildConfig.PROJECTM_VERSION, BuildConfig.PROJECTM_COMMIT)
+        binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
+        refreshSettingsInfo.run()
         binding.settingsScroll.scrollTo(0, 0)
         closePanelOnBack.isEnabled = true
         if (remoteNavigation) binding.switchAutoAdvance.requestFocus()
@@ -964,6 +983,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun closeSettingsSheet(showControls: Boolean) {
+        binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
         binding.settingsSheet.isVisible = false
         binding.controlBar.isVisible = showControls
         closePanelOnBack.isEnabled = showControls || binding.playlistPanel.isVisible
