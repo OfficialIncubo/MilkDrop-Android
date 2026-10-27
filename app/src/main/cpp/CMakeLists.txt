@@ -336,6 +336,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/RandomTextures.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderInputs.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/MotionVectors.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/PresetTiming.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/LegacyRendering.cmake)
 
 find_library(log-lib log)
 target_link_libraries(projectM PRIVATE ${log-lib})
