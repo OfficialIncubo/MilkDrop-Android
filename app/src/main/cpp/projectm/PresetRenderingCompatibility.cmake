@@ -44,3 +44,29 @@ patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/Border.cpp
             };
             glVertexAttrib4f(1, packedChannel(r), packedChannel(g), packedChannel(b), packedChannel(a));]=]
 )
+
+# Echo/gamma vertex colors use the same packed-byte behavior as borders in D3D.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/VideoEcho.cpp
+    [=[#include <Renderer/BlendMode.hpp>]=]
+    [=[#include <Renderer/BlendMode.hpp>
+#include <cmath>]=]
+    [=[namespace MilkdropPreset {]=]
+    [=[namespace MilkdropPreset {
+static float PackedEchoChannel(float value)
+{
+    const float scaled = value * 255.0f;
+    if (!std::isfinite(scaled)) return 0.0f;
+    float byte = static_cast<float>(std::fmod(std::trunc(static_cast<double>(scaled)), 256.0));
+    if (byte < 0.0f) byte += 256.0f;
+    return byte / 255.0f;
+}]=]
+    [=[gamma * mix * m_shade[vertex][0],]=] [=[PackedEchoChannel(gamma * mix * m_shade[vertex][0]),]=]
+    [=[gamma * mix * m_shade[vertex][1],]=] [=[PackedEchoChannel(gamma * mix * m_shade[vertex][1]),]=]
+    [=[gamma * mix * m_shade[vertex][2],]=] [=[PackedEchoChannel(gamma * mix * m_shade[vertex][2]),]=]
+    [=[mix * m_shade[vertex][0],]=] [=[PackedEchoChannel(mix * m_shade[vertex][0]),]=]
+    [=[mix * m_shade[vertex][1],]=] [=[PackedEchoChannel(mix * m_shade[vertex][1]),]=]
+    [=[mix * m_shade[vertex][2],]=] [=[PackedEchoChannel(mix * m_shade[vertex][2]),]=]
+    [=[gamma * m_shade[vertex][0],]=] [=[PackedEchoChannel(gamma * m_shade[vertex][0]),]=]
+    [=[gamma * m_shade[vertex][1],]=] [=[PackedEchoChannel(gamma * m_shade[vertex][1]),]=]
+    [=[gamma * m_shade[vertex][2],]=] [=[PackedEchoChannel(gamma * m_shade[vertex][2]),]=]
+)

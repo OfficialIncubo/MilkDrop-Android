@@ -93,9 +93,10 @@ void ShaderAudioAnalysis::Analyze(double secondsSinceLastFrame, std::uint32_t fr
     for (std::size_t i = 0; i < ShaderFftBins; ++i)
     {
         float magnitude = std::max(m_frame.spectrum[i] / smoothing.rms * m_frame.scaling - m_frame.noiseFloor, 0.0f);
-        if (i < 24)
+        const float lowBins = 24.0f * 44100.0f / m_sampleRate;
+        if (static_cast<float>(i) < lowBins)
         {
-            const float t = static_cast<float>(i) / 24.0f;
+            const float t = static_cast<float>(i) / lowBins;
             magnitude *= 0.15f + 0.85f * t * t;
         }
         smoothing.levels[i] += (magnitude - smoothing.levels[i]) *
