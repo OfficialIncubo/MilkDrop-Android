@@ -17,6 +17,7 @@ internal class PcmCaptureThread(
     private val audioRecord: AudioRecord,
     private val channels: Int,
     private val sink: PcmSink,
+    private val preferLatest: Boolean = false,
 ) {
     private val running = AtomicBoolean(false)
     private var thread: Thread? = null
@@ -39,17 +40,29 @@ internal class PcmCaptureThread(
         }
         val readThread = Thread({
             val buffer = ShortArray(audioRecord.sampleRate / READS_PER_SECOND * channels)
+            // Size the catch-up budget from the recorder's actual queue. A finite
+            // budget prevents continuous input from keeping us in the drain loop.
+            val drainReads = (audioRecord.bufferSizeInFrames + buffer.size / channels - 1) /
+                (buffer.size / channels)
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
                 while (running.get()) {
-                    val read = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                    var read = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
                     if (read < 0) {
                         if (running.get()) Log.w(TAG, "PCM capture failed: $read")
                         break
                     }
                     if (read > 0 && running.get()) {
+                        if (preferLatest) {
+                            for (attempt in 0 until drainReads) {
+                                if (!running.get()) break
+                                val newer = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
+                                if (newer <= 0) break
+                                read = newer
+                            }
+                        }
                         val frameCount = read / channels
-                        sink(buffer, frameCount, channels, audioRecord.sampleRate, false)
+                        if (running.get()) sink(buffer, frameCount, channels, audioRecord.sampleRate, false)
                     }
                 }
             } catch (e: RuntimeException) {
