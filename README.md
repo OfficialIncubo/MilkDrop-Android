@@ -151,13 +151,19 @@ its cast icon animates outward through the signal waves.
   TV remote or **Stop cast** on the phone to return to local visuals. Receiving is advertised
   only while the TV app is in the foreground. Android 9 remains supported.
 - **Google Cast / Chromecast / Google TV:** requires Google Play services and a receiver on
-  the same reachable Wi-Fi or Ethernet network. The phone serves a session-only H.264 live
+  the same reachable Wi-Fi or Ethernet network. A configured **MilkDrop Live web receiver**
+  receives per-frame fragmented MP4 over a continuous connection and catches up after stalls,
+  avoiding HLS's multi-second playlist startup. It opens from the device chooser without a
+  TV app installation. Host/register the receiver and supply its Cast app ID as described in
+  [custom Cast receiver setup](Docs/CAST_RECEIVER.md). Builds without that ID keep Google's
+  Default Media Receiver: the phone serves a session-only H.264 live
   stream with a one-second segment target and roughly three seconds of startup video;
   receiver buffering still adds delay. The app advertises a short
   live window and requests live playback if the receiver reports excessive drift; this
   does not eliminate the receiver's own buffer. Guest networks that isolate
   devices can prevent playback. The Default Media Receiver controls its startup logo;
-  replacing that screen and playback pipeline requires a registered, hosted custom receiver.
+  the custom receiver replaces the app's player UI but cannot suppress Google's earlier
+  application-launch screen. Neither path guarantees zero latency.
 - **Miracast / Wireless Display and external displays:** supported when Android exposes the
   display as a video route or connected presentation display. Use **Wireless display / Miracast…**
   in the Cast picker or MilkDrop Settings to open the phone's system picker (or connection

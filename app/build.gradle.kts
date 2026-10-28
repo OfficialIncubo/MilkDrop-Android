@@ -23,6 +23,13 @@ val projectmCommit = runCatching {
     else revision.getOrNull(1)?.takeIf { it.matches(Regex("(?:[0-9a-f]{40}|[0-9a-f]{64})")) }
 }.getOrNull() ?: "Unknown"
 
+val castReceiverAppId = providers.gradleProperty("milkdropCastReceiverAppId")
+    .orElse(providers.environmentVariable("MILKDROP_CAST_RECEIVER_APP_ID"))
+    .getOrElse("").trim().uppercase()
+require(castReceiverAppId.isEmpty() || castReceiverAppId.matches(Regex("[0-9A-F]{8}"))) {
+    "milkdropCastReceiverAppId must be an 8-digit hexadecimal Google Cast application ID"
+}
+
 android {
     namespace = "com.milkdrop.visualizer"
     compileSdk = 35
@@ -36,6 +43,7 @@ android {
         versionName = "2.0.0"
         buildConfigField("String", "PROJECTM_VERSION", "\"$projectmVersion\"")
         buildConfigField("String", "PROJECTM_COMMIT", "\"$projectmCommit\"")
+        buildConfigField("String", "CAST_RECEIVER_APP_ID", "\"$castReceiverAppId\"")
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")

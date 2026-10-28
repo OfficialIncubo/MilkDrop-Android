@@ -81,7 +81,7 @@
         <item>24 FPS</item><item>30 FPS</item><item>45 FPS</item><item>50 FPS</item>
         <item>60 FPS</item><item>120 FPS</item><item>Max (Unlimited)</item>
     </string-array>
-    <string name="frame_rate_description">Max removes the app’s FPS limit. Actual speed depends on your display and device. Casting video is limited to 30 FPS.</string>
+    <string name="frame_rate_description">Max removes the app’s FPS limit. Actual speed depends on your display and device. Google Cast targets up to 60 FPS, depending on encoder and receiver support.</string>
     <string name="fps_30">30</string>
     <string name="fps_45">45</string>
     <string name="fps_60">60</string>

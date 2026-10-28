@@ -13,6 +13,8 @@ jobs:
     name: Build MilkDrop
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      MILKDROP_CAST_RECEIVER_APP_ID: ${{ vars.MILKDROP_CAST_RECEIVER_APP_ID }}
 
     steps:
       - name: Check out source and submodules
@@ -48,6 +50,12 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Check custom Cast receiver
+        run: |
+          node --check cast-receiver/receiver.js
+          node --check cast-receiver/stream.js
+          node cast-receiver/receiver.test.cjs
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace

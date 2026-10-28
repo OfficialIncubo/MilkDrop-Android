@@ -4,6 +4,9 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Bundle
+import android.os.Build
+import android.os.Process
+import android.util.Log
 import android.view.Surface
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -16,6 +19,7 @@ internal class VisualStreamEncoder(
     private val onError: (Exception) -> Unit,
     private val direct: DirectVideoSender? = null,
     requestedFramesPerSecond: Int = 60,
+    private val live: LiveCastServer? = null,
 ) : Closeable {
     val width: Int
     val height: Int
@@ -32,31 +36,44 @@ internal class VisualStreamEncoder(
         var size = 960 to 544
         var selectedRate = 0
         var failure: Exception? = null
-        val attempts = listOf(960 to 544, 640 to 368).flatMap { (w, h) ->
-            listOf(requestedFramesPerSecond, minOf(requestedFramesPerSecond, 60), minOf(requestedFramesPerSecond, 30))
-                .distinct().map { fps -> Triple(w, h, fps) }
+        // Some older vendor codecs reject optional realtime hints. Retry the same
+        // mode without hints before sacrificing resolution or frame rate.
+        val attempts = CastEncodingPolicy.modes(requestedFramesPerSecond).flatMap { mode ->
+            listOf(mode to true, mode to false)
         }
-        for ((w, h, requestedRate) in attempts) {
+        for ((mode, realtime) in attempts) {
+            val (w, h, requestedRate) = mode
             val candidate = try { MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC) }
                 catch (e: Exception) { failure = e; continue }
             try {
-                val capabilities = checkNotNull(candidate.codecInfo
-                    .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC).videoCapabilities)
+                val codecCapabilities = candidate.codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+                val capabilities = checkNotNull(codecCapabilities.videoCapabilities)
                 val rates = capabilities.getSupportedFrameRatesFor(w, h)
-                val fps = requestedRate.coerceIn(
-                    kotlin.math.ceil(rates.lower).toInt().coerceAtLeast(1),
-                    kotlin.math.floor(rates.upper).toInt().coerceAtLeast(1))
+                // Keep support for older encoders whose ceiling is below 30 fps.
+                // High-rate attempts must not silently become a slow HD mode.
+                val fps = if (requestedRate <= 30) minOf(requestedRate, kotlin.math.floor(rates.upper).toInt()) else requestedRate
+                check(capabilities.areSizeAndRateSupported(w, h, fps.toDouble())) { "Encoder cannot sustain $w x $h at $fps fps" }
                 val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
                     setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-                    setInteger(MediaFormat.KEY_BIT_RATE, (if (w > 640) 2_000_000 else 1_200_000) * fps / 30)
+                    setInteger(MediaFormat.KEY_BIT_RATE, capabilities.bitrateRange.clamp(CastEncodingPolicy.bitRate(mode.copy(fps = fps))))
                     setInteger(MediaFormat.KEY_FRAME_RATE, fps)
                     setFloat(MediaFormat.KEY_I_FRAME_INTERVAL, CastVideoTiming.KEY_FRAME_SECONDS)
                     setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                    if (realtime) {
+                        setInteger(MediaFormat.KEY_PRIORITY, 0)
+                        setInteger(MediaFormat.KEY_LATENCY, 0)
+                        setInteger(MediaFormat.KEY_OPERATING_RATE, fps)
+                        if (Build.VERSION.SDK_INT >= 29) setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+                        if (codecCapabilities.encoderCapabilities.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)) {
+                            setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                        }
+                    }
                 }
                 candidate.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 selectedSurface = candidate.createInputSurface()
                 candidate.start()
                 selected = candidate; size = w to h; selectedRate = fps
+                Log.i("VisualStreamEncoder", "Cast encoder ${candidate.name}: ${w}x$h at $fps fps, realtime hints=$realtime")
                 break
             } catch (e: Exception) {
                 failure = e
@@ -69,6 +86,7 @@ internal class VisualStreamEncoder(
         width = size.first; height = size.second
         framesPerSecond = selectedRate
         direct?.requestKeyFrame = { syncRequested.set(true) }
+        live?.requestKeyFrame = { syncRequested.set(true) }
         drainThread = Thread(::drain, "MilkDrop-cast-encoder").apply { isDaemon = true; start() }
     }
 
@@ -83,6 +101,7 @@ internal class VisualStreamEncoder(
         var nextDiscontinuity = false
         var ready = false
         var lastKeyRequest = 0L
+        var pendingLive: Triple<ByteArray, Long, Boolean>? = null
         val frameDurationUs = 1_000_000L / framesPerSecond
         val maxSegmentUs = CastVideoTiming.TARGET_SEGMENT_SECONDS * 1_000_000L
         fun publish(duration: Double) {
@@ -96,6 +115,7 @@ internal class VisualStreamEncoder(
             codec.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
         }
         try {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY)
             while (running.get()) {
                 if (syncRequested.getAndSet(false)) requestKeyFrame()
                 val index = codec.dequeueOutputBuffer(info, 20_000)
@@ -106,7 +126,9 @@ internal class VisualStreamEncoder(
                     try {
                         val buffer = codec.getOutputBuffer(index) ?: continue
                         if (info.size <= 0) continue
-                        check(info.size <= MAX_FRAME_BYTES) { "Invalid encoder output size" }
+                        check(info.offset >= 0 && info.offset <= buffer.capacity() && info.size <= buffer.capacity() - info.offset) {
+                            "Invalid encoder output range"
+                        }
                         buffer.position(info.offset); buffer.limit(info.offset + info.size)
                         val bytes = annexB(buffer.slice())
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
@@ -116,6 +138,18 @@ internal class VisualStreamEncoder(
                         if (firstTimestamp < 0) firstTimestamp = info.presentationTimeUs
                         val timeUs = (info.presentationTimeUs - firstTimestamp).coerceAtLeast(0)
                         if (!headers.complete) { requestKeyFrame(); continue }
+                        if (live != null) {
+                            live.configure(width, height, framesPerSecond, headers.sequence(), headers.picture())
+                            val previous = pendingLive
+                            if (previous != null) {
+                                val publishedKey = live.offer(previous.first, previous.second,
+                                    (timeUs - previous.second).coerceAtLeast(1), previous.third)
+                                if (publishedKey && !ready) { ready = true; onReady() }
+                            }
+                            pendingLive = Triple(bytes, timeUs, key)
+                            if (!ready && !key) requestKeyFrame()
+                            continue
+                        }
                         if (direct != null) {
                             direct.configure(width, height, headers.bytes)
                             direct.offer((if (key) headers.bytes else byteArrayOf()) + bytes, timeUs, key)
@@ -157,6 +191,7 @@ internal class VisualStreamEncoder(
     override fun close() {
         if (!running.getAndSet(false)) return
         direct?.requestKeyFrame = null
+        live?.requestKeyFrame = null
         if (Thread.currentThread() !== drainThread) drainThread.join(1000)
         runCatching { codec.stop() }
         runCatching { codec.release() }
@@ -179,5 +214,4 @@ internal class VisualStreamEncoder(
         return output.toByteArray()
     }
 
-    private companion object { const val MAX_FRAME_BYTES = 4 * 1024 * 1024 }
 }

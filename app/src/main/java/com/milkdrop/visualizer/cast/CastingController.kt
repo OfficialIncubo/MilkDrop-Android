@@ -40,6 +40,7 @@ import com.milkdrop.visualizer.render.MilkDropSurfaceView
 import java.io.Closeable
 import java.net.Inet4Address
 import java.util.concurrent.Executors
+import org.json.JSONObject
 
 /** One foreground-only cast session. All session/UI mutations run on the main thread. */
 class CastingController(
@@ -70,7 +71,7 @@ class CastingController(
     private val suppressedDisplays = mutableSetOf<Int>()
     private val selector = MediaRouteSelector.Builder()
         .addControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO)
-        .addControlCategory(CastMediaControlIntent.categoryForCast(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
+        .addControlCategory(CastMediaControlIntent.categoryForCast(CastReceiverConfig.applicationId))
         .build()
     private var castContext: CastContext? = null
     private var started = false
@@ -83,6 +84,7 @@ class CastingController(
     private var presentation: ReceiverPresentation? = null
     private var encoder: VisualStreamEncoder? = null
     private var server: LiveStreamServer? = null
+    private var liveServer: LiveCastServer? = null
     private var streamStarting = false
     private var session: CastSession? = null
     private var mediaClient: RemoteMediaClient? = null
@@ -301,7 +303,7 @@ class CastingController(
         val ending = pendingDisconnect
         onState(State(started && receivers.isNotEmpty(), ending?.name ?: device,
             connecting || ending?.let { !it.prompted } == true, casting || ending != null, ending != null,
-            presentation != null || ending != null, session != null))
+            presentation != null || ending != null, session != null && !CastReceiverConfig.custom))
         resolvePeerName()
     }
 
@@ -424,6 +426,10 @@ class CastingController(
         s.castDevice?.friendlyName?.takeIf { it.isNotBlank() }?.let { device = it }
         session = s; streamStarting = true
         val id = generation
+        if (CastReceiverConfig.custom) {
+            startCustomGoogleStream(s, id)
+            return
+        }
         // Standard Cast video receivers support up to 60 fps; the codec can negotiate lower.
         val frameRate = encodingFrameRate().coerceAtMost(60)
         worker.execute {
@@ -449,6 +455,62 @@ class CastingController(
                 }
             } catch (e: Exception) {
                 pendingEncoder?.close(); pendingServer?.close()
+                main.post { fail(id, e) }
+            }
+        }
+    }
+
+    /** A registered web receiver consumes fMP4 immediately instead of waiting for an HLS playlist. */
+    private fun startCustomGoogleStream(s: CastSession, id: Int) {
+        try {
+            s.setMessageReceivedCallbacks(CastReceiverConfig.NAMESPACE) { _, _, message ->
+                main.post {
+                    if (id != generation || session !== s) return@post
+                    val status = runCatching { JSONObject(message) }.getOrNull() ?: return@post
+                    when (status.optString("type")) {
+                        "PLAYING" -> {
+                            connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
+                        }
+                        "ERROR" -> fail(id, IllegalStateException("Live receiver: ${status.optString("message")}"))
+                        "STATS" -> Log.d(TAG, "Live receiver: $status")
+                        "STOPPED" -> stop()
+                    }
+                }
+            }
+        } catch (e: Exception) { fail(id, e); return }
+        worker.execute {
+            var stream: LiveCastServer? = null
+            var video: VisualStreamEncoder? = null
+            try {
+                val address = lanAddress()
+                val live = LiveCastServer().also { stream = it }
+                video = VisualStreamEncoder(onReady = {
+                    main.post {
+                        if (id == generation && session === s && started) {
+                            val start = JSONObject().put("type", "START").put("version", 1)
+                                .put("url", live.url(address)).put("mime", live.mime)
+                                .put("maxRecordBytes", live.recordLimit)
+                            try {
+                                s.sendMessage(CastReceiverConfig.NAMESPACE, start.toString()).setResultCallback { result ->
+                                    if (!result.isSuccess) fail(id, IllegalStateException("Custom receiver refused live stream"))
+                                }
+                            } catch (error: Exception) { fail(id, error) }
+                        }
+                    }
+                }, onError = { error -> main.post { fail(id, error) } },
+                    requestedFramesPerSecond = encodingFrameRate().coerceAtMost(60), live = live)
+                val pending = video
+                main.post {
+                    if (id != generation || !started || closed) cleanup(null, pending, null, live)
+                    else {
+                        encoder = pending; liveServer = live; streamStarting = false
+                        installOutput(VisualOutput(pending.surface, pending.width, pending.height, true,
+                            { error -> main.post { fail(id, error) } }).apply { maxFramesPerSecond = pending.framesPerSecond },
+                            pending.width to pending.height)
+                    }
+                }
+            } catch (e: Exception) {
+                video?.close(); stream?.close()
                 main.post { fail(id, e) }
             }
         }
@@ -524,15 +586,23 @@ class CastingController(
         connectedPeer.close()
         peerName = null; peerQueryActive = false; peerQueryAttempts = 0
         val oldOutput = output; val oldEncoder = encoder; val oldServer = server
+        val oldLive = liveServer
         renderer.milkDropRenderer.visualOutput = null; renderer.setCastSize(null)
-        output = null; encoder = null; server = null; streamStarting = false
+        output = null; encoder = null; server = null; liveServer = null; streamStarting = false
         directSender?.close(); directSender = null
         mediaClient?.unregisterCallback(mediaEvents); mediaClient = null
-        val hadSession = session != null; session = null
+        val hadSession = session != null
+        session?.let { s ->
+            if (CastReceiverConfig.custom) {
+                runCatching { s.sendMessage(CastReceiverConfig.NAMESPACE, "{\"type\":\"STOP\"}") }
+                runCatching { s.removeMessageReceivedCallbacks(CastReceiverConfig.NAMESPACE) }
+            }
+        }
+        session = null
         val oldPresentation = presentation; presentation = null
         if (suppressDisplay && oldPresentation != null) suppressedDisplays.add(oldPresentation.display.displayId)
         device = null; connecting = false; casting = false
-        cleanup(oldOutput, oldEncoder, oldServer)
+        cleanup(oldOutput, oldEncoder, oldServer, oldLive)
         oldPresentation?.dismiss()
         if (hadSession) castContext?.sessionManager?.endCurrentSession(true)
         if (selectLocal) runCatching { router.unselect(MediaRouter.UNSELECT_REASON_STOPPED) }
@@ -546,12 +616,13 @@ class CastingController(
         stop(); onError()
     }
 
-    private fun cleanup(destination: VisualOutput?, video: VisualStreamEncoder?, stream: LiveStreamServer?) {
-        if (destination == null && video == null && stream == null) return
+    private fun cleanup(destination: VisualOutput?, video: VisualStreamEncoder?, stream: LiveStreamServer?, live: LiveCastServer? = null) {
+        if (destination == null && video == null && stream == null && live == null) return
         val release = Runnable {
             runCatching { destination?.close() }
             runCatching { video?.close() }
             runCatching { stream?.close() }
+            runCatching { live?.close() }
         }
         try { worker.execute(release) } catch (_: java.util.concurrent.RejectedExecutionException) {
             Thread(release, "MilkDrop-cast-cleanup").apply { isDaemon = true; start() }
