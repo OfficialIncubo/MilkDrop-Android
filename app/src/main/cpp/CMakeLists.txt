@@ -340,6 +340,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/LegacyRendering.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/WaveformCompatibility.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/ShaderStateCompatibility.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/BeatDropWaveforms.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/PredefinedVariables.cmake)
 
 find_library(log-lib log)
 target_link_libraries(projectM PRIVATE ${log-lib})
