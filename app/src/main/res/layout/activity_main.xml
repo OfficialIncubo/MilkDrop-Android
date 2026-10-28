@@ -405,6 +405,22 @@
                     android:textColor="@color/overlay_content_secondary"
                     android:textSize="13sp" />
 
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchStereoInternalAudio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/setting_stereo_internal_audio"
+                    android:textColor="@color/overlay_content"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stereo_internal_audio_description"
+                    android:textColor="@color/overlay_content_secondary"
+                    android:textSize="13sp" />
+
                 <TextView
                     android:id="@+id/audioSensitivityLabel"
                     style="@style/SettingLabel"

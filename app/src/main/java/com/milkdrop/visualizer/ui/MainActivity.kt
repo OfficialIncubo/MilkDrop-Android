@@ -166,11 +166,11 @@ class MainActivity : AppCompatActivity() {
             playbackConsentPending = false
             if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC) return@registerForActivityResult
             val grant = result.data
-            if (result.resultCode == RESULT_OK && grant != null && Build.VERSION.SDK_INT >= 29) {
+            if (settings.stereoInternalAudio && result.resultCode == RESULT_OK && grant != null && Build.VERSION.SDK_INT >= 29) {
                 val session = PlaybackAudioSession(this)
                 playbackAudioSession = session
                 session.open(result.resultCode, grant, ready = { projection ->
-                    if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC) {
+                    if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC || !settings.stereoInternalAudio) {
                         session.close()
                     } else {
                         audioCaptureManager.setPlaybackProjection(projection)
@@ -309,6 +309,8 @@ class MainActivity : AppCompatActivity() {
         configureTimingSpinner(binding.spinnerFrameRate, R.array.frame_rate_options, fpsIndex)
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
         binding.groupAudioSource.check(AUDIO_INPUT_BUTTON_IDS.getValue(settings.audioInput))
+        binding.switchStereoInternalAudio.isChecked = settings.stereoInternalAudio
+        binding.switchStereoInternalAudio.isEnabled = Build.VERSION.SDK_INT >= 29
         binding.sliderAudioSensitivity.max = (AudioTuning.SENSITIVITY_MAX * 10).roundToInt()
         binding.sliderAudioSensitivity.progress = (settings.audioSensitivity * 10).roundToInt()
         binding.sliderFftShaderScaling.max = (AudioTuning.FFT_SCALING_MAX * 100).roundToInt()
@@ -860,7 +862,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchPresetNameDuringTransitions,
-            binding.switchScreenDependentRendering,
+            binding.switchScreenDependentRendering, binding.switchStereoInternalAudio,
             binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {
             it.setBackgroundResource(R.drawable.remote_focus_background)
         }
@@ -926,6 +928,12 @@ class MainActivity : AppCompatActivity() {
             qualityIndex = QUALITY_BUTTON_IDS.indexOf(id)
             settings.qualityIndex = qualityIndex
             applyQuality()
+        }
+        binding.switchStereoInternalAudio.setOnCheckedChangeListener { _, checked ->
+            if (updatingControls) return@setOnCheckedChangeListener
+            settings.stereoInternalAudio = checked
+            releasePlaybackAudioSession()
+            startPersistedAudioSource()
         }
         binding.groupAudioSource.onUserSelection { id ->
             audioCaptureManager.stopAll()
@@ -1300,7 +1308,7 @@ class MainActivity : AppCompatActivity() {
             playbackAudioSession = null
             // Selecting Internal/Auto again starts a new consent session.
             if (!playbackConsentPending) playbackConsentRequested = false
-        } else if (Build.VERSION.SDK_INT >= 29 && !playbackConsentRequested) {
+        } else if (settings.stereoInternalAudio && Build.VERSION.SDK_INT >= 29 && !playbackConsentRequested) {
             playbackConsentRequested = true
             playbackConsentPending = true
             audioCaptureManager.stopAll()

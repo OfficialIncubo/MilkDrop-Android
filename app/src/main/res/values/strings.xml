@@ -100,7 +100,9 @@
     <string name="audio_source_automatic_mic">Auto is using the microphone while Internal audio is silent or unavailable.</string>
     <string name="audio_source_automatic_unavailable">Auto is waiting for audio input. Check microphone access or start playback.</string>
     <string name="audio_source_mic_description">Listens through your microphone, picking up music from speakers and sounds around you.</string>
-    <string name="audio_source_internal_description">Captures stereo playback when supported, with mono as a fallback. Android 10 and newer ask for capture permission. Some apps block capture.</string>
+    <string name="audio_source_internal_description">Captures playback without a capture popup by default. Enable Stereo internal audio below for separate left and right channels. Some apps block capture.</string>
+    <string name="setting_stereo_internal_audio">Stereo internal audio</string>
+    <string name="stereo_internal_audio_description">Optional for Internal and Auto on Android 10 or newer. Android asks for capture consent each session. Uses mono if unavailable or declined. Off by default; microphone stereo is independent.</string>
     <string name="audio_capture_channel">Playback audio capture</string>
     <string name="audio_capture_title">MilkDrop is listening to playback</string>
     <string name="audio_capture_description">Playback audio is driving your visuals.</string>

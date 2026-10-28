@@ -81,6 +81,11 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putFloat(KEY_FFT_NOISE_FLOOR,
             AudioTuning.bounded(value, AudioTuning.FFT_NOISE_FLOOR_MAX, AudioTuning.FFT_NOISE_FLOOR_DEFAULT)).apply()
 
+    /** Stereo playback capture is explicitly opt-in; legacy Internal never prompts. */
+    var stereoInternalAudio: Boolean
+        get() = prefs.getBoolean("stereo_internal_audio", false)
+        set(value) = prefs.edit().putBoolean("stereo_internal_audio", value).apply()
+
     /** Reads previous audio choices and maps both playback modes to the retained Internal source. */
     var audioInput: AudioInput
         get() = prefs.getString(KEY_AUDIO_INPUT, null)
