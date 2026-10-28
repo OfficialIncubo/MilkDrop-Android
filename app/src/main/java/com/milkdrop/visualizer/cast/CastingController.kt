@@ -85,6 +85,7 @@ class CastingController(
     private var encoder: VisualStreamEncoder? = null
     private var server: LiveStreamServer? = null
     private var liveServer: LiveCastServer? = null
+    private var customProbeTimeout: Runnable? = null
     private var streamStarting = false
     private var session: CastSession? = null
     private var mediaClient: RemoteMediaClient? = null
@@ -462,12 +463,20 @@ class CastingController(
 
     /** A registered web receiver consumes fMP4 immediately instead of waiting for an HLS playlist. */
     private fun startCustomGoogleStream(s: CastSession, id: Int) {
+        var encodingStarted = false
+        fun negotiated(fullHd: Boolean) {
+            if (encodingStarted || id != generation || session !== s || !started || closed) return
+            encodingStarted = true
+            customProbeTimeout?.let(main::removeCallbacks); customProbeTimeout = null
+            encodeCustomGoogleStream(s, id, fullHd)
+        }
         try {
             s.setMessageReceivedCallbacks(CastReceiverConfig.NAMESPACE) { _, _, message ->
                 main.post {
                     if (id != generation || session !== s) return@post
                     val status = runCatching { JSONObject(message) }.getOrNull() ?: return@post
                     when (status.optString("type")) {
+                        "CAPABILITIES" -> negotiated(status.optBoolean("fullHd60", false))
                         "PLAYING" -> {
                             connecting = false; casting = true; main.removeCallbacks(timeout); refresh()
                         }
@@ -477,7 +486,16 @@ class CastingController(
                     }
                 }
             }
+            // Older hosted receivers do not answer this probe; keep their 720p fallback.
+            customProbeTimeout = Runnable { negotiated(false) }.also { main.postDelayed(it, 2000) }
+            s.sendMessage(CastReceiverConfig.NAMESPACE, "{\"type\":\"HELLO\"}").setResultCallback { result ->
+                if (!result.isSuccess) negotiated(false)
+            }
         } catch (e: Exception) { fail(id, e); return }
+    }
+
+    private fun encodeCustomGoogleStream(s: CastSession, id: Int, fullHd: Boolean) {
+        val frameRate = encodingFrameRate().coerceAtMost(60)
         worker.execute {
             var stream: LiveCastServer? = null
             var video: VisualStreamEncoder? = null
@@ -498,7 +516,7 @@ class CastingController(
                         }
                     }
                 }, onError = { error -> main.post { fail(id, error) } },
-                    requestedFramesPerSecond = encodingFrameRate().coerceAtMost(60), live = live)
+                    requestedFramesPerSecond = frameRate, live = live, fullHdSupported = fullHd)
                 val pending = video
                 main.post {
                     if (id != generation || !started || closed) cleanup(null, pending, null, live)
@@ -580,6 +598,7 @@ class CastingController(
 
     fun stop(selectLocal: Boolean = true, suppressDisplay: Boolean = true) {
         generation++
+        customProbeTimeout?.let(main::removeCallbacks); customProbeTimeout = null
         main.removeCallbacks(timeout)
         main.removeCallbacks(checkLivePosition)
         main.removeCallbacks(retryPeerName)

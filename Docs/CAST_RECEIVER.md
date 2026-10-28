@@ -14,9 +14,11 @@ most half a second (and at most one second's frame count), and resumes slow clie
 only at a key frame. Video frames that depend on discarded frames are never sent
 as a substitute for a key frame.
 
-The encoder prefers 1280×720 at 60 FPS for Google Cast, tries smaller frames before
+The custom receiver reports whether it supports 1920×1080 at 60 FPS before encoding
+starts. The encoder prefers that mode when confirmed, then 1280×720 and smaller frames before
 30 FPS, requests realtime/no-reordering encoding, and increases bitrate with pixel
-count and frame rate. Android 9 remains supported, with codec/resolution fallbacks.
+count and frame rate. Unknown/default receiver capabilities keep the 720p ceiling.
+Android 9 remains supported, with codec/resolution fallbacks.
 Resolution, FPS and latency depend on both devices, the preset and the LAN. This is
 not zero latency, and no end-to-end latency figure is claimed without physical testing.
 Google's own application-launch screen can still appear before the hosted receiver loads.

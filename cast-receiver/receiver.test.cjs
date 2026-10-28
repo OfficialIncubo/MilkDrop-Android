@@ -33,10 +33,14 @@ function reader(chunks) { return {async read(){return chunks.length ? {value:chu
  const samples=[];for(let i=0;i<30;i++){const h=Buffer.alloc(4);h.writeUInt32BE(1);samples.push(Buffer.concat([h,Buffer.from([1])]));}
  let pendingRead;
  const streamReader={async read(){if(samples.length)return {value:samples.shift(),done:false};return new Promise(resolve=>{pendingRead=resolve;});},async cancel(){canceled=true;if(pendingRead)pendingRead({done:true});}};
- const context={sendCustomMessage(ns,sender,data){messages.push(data);},addCustomMessageListener(ns,fn){callback=fn;},addEventListener(){},start(){},getSenders(){return [1]},stop(){}};
+ let fullHdSupported=true;
+ const context={canDisplayType:(type,codec,w,h,fps)=>{assert.equal(w,1920);assert.equal(h,1080);assert.equal(fps,60);return fullHdSupported;},sendCustomMessage(ns,sender,data){messages.push(data);},addCustomMessageListener(ns,fn){callback=fn;},addEventListener(){},start(){},getSenders(){return [1]},stop(){}};
  class TestURL extends URL {static createObjectURL(){return 'blob:test'}static revokeObjectURL(){revoked++}}
  const sandbox={cast:{framework:{CastReceiverContext:{getInstance:()=>context},system:{MessageType:{JSON:1},EventType:{SENDER_DISCONNECTED:1}}}},document:{getElementById:()=>video},window:{MediaSource,addEventListener(){}},MediaSource,URL:TestURL,AbortController,DOMException,MilkDropStream:{records},fetch:async()=>({ok:true,body:{getReader:()=>streamReader}}),performance,setInterval(){timers++;return 1;},clearInterval(){timers--;},console};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'receiver.js'),'utf8'),sandbox);
+ callback({senderId:'sender',data:{type:'HELLO'}});
+ assert.equal(messages.at(-1).fullHd60,true);fullHdSupported=false;
+ callback({senderId:'sender',data:{type:'HELLO'}});assert.equal(messages.at(-1).fullHd60,false);
  callback({senderId:'sender',data:{type:'START',version:1,url:'http://127.0.0.1:1234/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/frames',mime:'video/mp4; codecs="avc1.42c020"',maxRecordBytes:1024}});
  await new Promise(resolve=>setTimeout(resolve,50));
  assert.equal(count,30,'play() must not stall the append loop while the decoder needs input');

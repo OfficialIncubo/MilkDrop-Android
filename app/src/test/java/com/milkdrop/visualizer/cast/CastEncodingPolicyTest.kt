@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CastEncodingPolicyTest {
+    @Test fun prefersFullHdOnlyAfterReceiverConfirmation() {
+        val modes = CastEncodingPolicy.modes(60, fullHdSupported = true)
+        assertEquals(CastEncodingPolicy.Mode(1920, 1080, 60), modes.first())
+        assertEquals(CastEncodingPolicy.Mode(1280, 720, 60), modes[1])
+        assertTrue(CastEncodingPolicy.modes(60).none { it.width == 1920 })
+        assertTrue(modes.indexOf(CastEncodingPolicy.Mode(640, 368, 60)) <
+            modes.indexOf(CastEncodingPolicy.Mode(1920, 1080, 30)))
+    }
+
     @Test fun prefersSmallerHighFrameRateBeforeSlowerHd() {
         val modes = CastEncodingPolicy.modes(60)
         assertEquals(CastEncodingPolicy.Mode(1280, 720, 60), modes.first())

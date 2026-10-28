@@ -20,6 +20,7 @@ internal class VisualStreamEncoder(
     private val direct: DirectVideoSender? = null,
     requestedFramesPerSecond: Int = 60,
     private val live: LiveCastServer? = null,
+    fullHdSupported: Boolean = false,
 ) : Closeable {
     val width: Int
     val height: Int
@@ -38,7 +39,7 @@ internal class VisualStreamEncoder(
         var failure: Exception? = null
         // Some older vendor codecs reject optional realtime hints. Retry the same
         // mode without hints before sacrificing resolution or frame rate.
-        val attempts = CastEncodingPolicy.modes(requestedFramesPerSecond).flatMap { mode ->
+        val attempts = CastEncodingPolicy.modes(requestedFramesPerSecond, fullHdSupported).flatMap { mode ->
             listOf(mode to true, mode to false)
         }
         for ((mode, realtime) in attempts) {

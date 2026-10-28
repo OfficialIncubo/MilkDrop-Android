@@ -110,6 +110,12 @@
   context.addCustomMessageListener(namespace, (event) => {
     const message = event.data;
     if (!message || typeof message !== "object") return;
+    if (message.type === "HELLO") {
+      let fullHd60 = false;
+      try { fullHd60 = context.canDisplayType("video/mp4", "avc1.42c02a", 1920, 1080, 60); } catch (_) {}
+      send(event.senderId, { type: "CAPABILITIES", fullHd60: fullHd60 === true });
+      return;
+    }
     if (message.type === "STOP") { stop(); send(event.senderId, { type: "STOPPED" }); }
     if (message.type === "START") start(event.senderId, message).catch(error => {
       send(event.senderId, { type: "ERROR", message: String(error.message || error) });
