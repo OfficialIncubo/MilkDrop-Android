@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.Animatable
 import android.media.AudioManager
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -46,6 +47,7 @@ import com.milkdrop.visualizer.R
 import com.milkdrop.visualizer.BuildConfig
 import com.milkdrop.visualizer.audio.AudioCaptureManager
 import com.milkdrop.visualizer.audio.AudioInput
+import com.milkdrop.visualizer.audio.PlaybackAudioSession
 import com.milkdrop.visualizer.cast.CastingController
 import com.milkdrop.visualizer.cast.DirectCastReceiver
 import com.milkdrop.visualizer.cast.WirelessDisplaySettings
@@ -153,6 +155,37 @@ class MainActivity : AppCompatActivity() {
     private val permissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             startPersistedAudioSource()
+        }
+
+    private var playbackAudioSession: PlaybackAudioSession? = null
+    private var playbackConsentRequested = false
+    private var playbackConsentPending = false
+    private var resumePlaybackAudio = false
+    private val playbackConsentLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            playbackConsentPending = false
+            if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC) return@registerForActivityResult
+            val grant = result.data
+            if (result.resultCode == RESULT_OK && grant != null && Build.VERSION.SDK_INT >= 29) {
+                val session = PlaybackAudioSession(this)
+                playbackAudioSession = session
+                session.open(result.resultCode, grant, ready = { projection ->
+                    if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC) {
+                        session.close()
+                    } else {
+                        audioCaptureManager.setPlaybackProjection(projection)
+                        startPersistedAudioSource()
+                    }
+                }, ended = {
+                    if (::audioCaptureManager.isInitialized) audioCaptureManager.setPlaybackProjection(null)
+                    if (!isDestroyed && !receivingLive) {
+                        if (foreground) startPersistedAudioSource() else resumePlaybackAudio = true
+                    }
+                })
+            } else {
+                // Consent is optional; retain the Android 9-compatible mono path.
+                startPersistedAudioSource()
+            }
         }
 
     private val castNamePermissionsLauncher =
@@ -492,7 +525,7 @@ class MainActivity : AppCompatActivity() {
             if (binding.playlistPanel.isVisible) closePlaylistPanel()
             resumeAudioAfterReceiver = true
             castingController?.pause()
-            audioCaptureManager.stopAll()
+            releasePlaybackAudioSession()
             surfaceView.onPause()
             binding.settingsSheet.isVisible = false
             binding.playlistPanel.isVisible = false
@@ -612,8 +645,8 @@ class MainActivity : AppCompatActivity() {
         surfaceView.onResume()
         castingController?.start()
         tvReceiver?.start()
-        if (resumeAudioAfterReceiver) {
-            resumeAudioAfterReceiver = false; resumeAutomaticAudio = false
+        if (resumeAudioAfterReceiver || resumePlaybackAudio) {
+            resumeAudioAfterReceiver = false; resumeAutomaticAudio = false; resumePlaybackAudio = false
             startPersistedAudioSource()
         } else if (resumeAutomaticAudio) {
             resumeAutomaticAudio = false
@@ -716,8 +749,10 @@ class MainActivity : AppCompatActivity() {
         searchGeneration++
         if (::audioCaptureManager.isInitialized) {
             audioCaptureManager.onAutomaticSourceChanged = null
-            audioCaptureManager.stopAll()
+            audioCaptureManager.setPlaybackProjection(null)
         }
+        playbackAudioSession?.close()
+        playbackAudioSession = null
         if (::binding.isInitialized) {
             binding.engineLiveInfo.removeCallbacks(refreshSettingsInfo)
             binding.playlistSearch.removeCallbacks(pendingSearch)
@@ -1254,11 +1289,31 @@ class MainActivity : AppCompatActivity() {
         if (receivingLive || isDestroyed) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED) {
-            audioCaptureManager.stopAll()
+            releasePlaybackAudioSession()
             showAudioInput(input)
             binding.audioSourceDescription.setText(R.string.audio_source_permission_required)
             return
         }
+        if (input == AudioInput.MIC) {
+            audioCaptureManager.setPlaybackProjection(null)
+            playbackAudioSession?.close()
+            playbackAudioSession = null
+            // Selecting Internal/Auto again starts a new consent session.
+            if (!playbackConsentPending) playbackConsentRequested = false
+        } else if (Build.VERSION.SDK_INT >= 29 && !playbackConsentRequested) {
+            playbackConsentRequested = true
+            playbackConsentPending = true
+            audioCaptureManager.stopAll()
+            showAudioInput(input)
+            try {
+                playbackConsentLauncher.launch(getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent())
+                return
+            } catch (e: RuntimeException) {
+                playbackConsentPending = false
+                Log.w(TAG, "Playback consent unavailable; using mono capture", e)
+            }
+        }
+        if (playbackConsentPending) return
         when (input) {
             AudioInput.MIC -> switchToMic()
             AudioInput.AUTOMATIC -> {
@@ -1277,10 +1332,18 @@ class MainActivity : AppCompatActivity() {
 
     /** Fallback when another source is unavailable; also updates the saved selection to Mic. */
     private fun switchToMic(): Boolean {
+        releasePlaybackAudioSession()
         val started = audioCaptureManager.startMic()
         showAudioInput(AudioInput.MIC)
         if (!started) binding.audioSourceDescription.setText(R.string.audio_source_mic_unavailable)
         return started
+    }
+
+    private fun releasePlaybackAudioSession() {
+        audioCaptureManager.setPlaybackProjection(null)
+        playbackAudioSession?.close()
+        playbackAudioSession = null
+        if (!playbackConsentPending) playbackConsentRequested = false
     }
 
     /** Saves [input] and shows it as selected, with its description. */

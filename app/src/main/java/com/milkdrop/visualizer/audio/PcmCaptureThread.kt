@@ -29,6 +29,9 @@ internal class PcmCaptureThread(
         if (!running.compareAndSet(false, true)) return
         try {
             audioRecord.startRecording()
+            check(audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                "Audio recorder did not start"
+            }
         } catch (e: RuntimeException) {
             running.set(false)
             audioRecord.release()

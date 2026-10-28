@@ -100,7 +100,11 @@
     <string name="audio_source_automatic_mic">Auto is using the microphone while Internal audio is silent or unavailable.</string>
     <string name="audio_source_automatic_unavailable">Auto is waiting for audio input. Check microphone access or start playback.</string>
     <string name="audio_source_mic_description">Listens through your microphone, picking up music from speakers and sounds around you.</string>
-    <string name="audio_source_internal_description">Listens to audio playing on your device. Some apps block capture, so their audio may not reach the visuals.</string>
+    <string name="audio_source_internal_description">Captures stereo playback when supported, with mono as a fallback. Android 10 and newer ask for capture permission. Some apps block capture.</string>
+    <string name="audio_capture_channel">Playback audio capture</string>
+    <string name="audio_capture_title">MilkDrop is listening to playback</string>
+    <string name="audio_capture_description">Playback audio is driving your visuals.</string>
+    <string name="audio_capture_stop">Use mono capture</string>
     <string name="audio_source_internal_unavailable">Internal audio is unavailable on this device, so the mic is on.</string>
     <string name="audio_source_mic_unavailable">The microphone is unavailable. Check that another app isn\'t using it, then try again.</string>
     <string name="audio_source_permission_required">Allow microphone access in Android settings to enable audio input.</string>

@@ -20,17 +20,33 @@ class MicAudioSource(
 
     @SuppressLint("MissingPermission")
     override fun start() {
-        val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE_HZ, CHANNEL_CONFIG, ENCODING)
-        val audioRecord = AudioRecord(
-            micInput(),
-            SAMPLE_RATE_HZ,
-            CHANNEL_CONFIG,
-            ENCODING,
-            minBufferSize,
-        )
-        val thread = PcmCaptureThread(audioRecord, CHANNELS, sink)
-        captureThread = thread
-        thread.start()
+        if (captureThread != null) return
+        var failure: RuntimeException? = null
+        // Request real interleaved stereo first. Some microphones expose only
+        // mono; retain that fallback rather than inventing a second channel.
+        for (channelConfig in intArrayOf(AudioFormat.CHANNEL_IN_STEREO, AudioFormat.CHANNEL_IN_MONO)) {
+            val minimum = AudioRecord.getMinBufferSize(SAMPLE_RATE_HZ, channelConfig, ENCODING)
+            if (minimum <= 0) continue
+            val record = try {
+                AudioRecord(micInput(), SAMPLE_RATE_HZ, channelConfig, ENCODING, minimum)
+            } catch (e: RuntimeException) {
+                failure = e
+                continue
+            }
+            if (record.state != AudioRecord.STATE_INITIALIZED) {
+                record.release()
+                continue
+            }
+            val worker = PcmCaptureThread(record, record.channelCount, sink)
+            try {
+                worker.start() // Releases the recorder itself if starting fails.
+                captureThread = worker
+                return
+            } catch (e: RuntimeException) {
+                failure = e
+            }
+        }
+        throw failure ?: IllegalStateException("No supported microphone capture format")
     }
 
     /**
@@ -55,8 +71,6 @@ class MicAudioSource(
 
     private companion object {
         const val SAMPLE_RATE_HZ = 44100
-        const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
-        const val CHANNELS = 1
     }
 }

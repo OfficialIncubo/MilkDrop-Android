@@ -29,6 +29,35 @@ static void AddShaderDeclarations(std::set<std::string>& declarations, const std
 )
 
 # Strip filtering/wrapping qualifiers before applying the random filename prefix.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/PresetState.hpp
+    [=[    std::map<int, Renderer::TextureSamplerDescriptor> randomTextureDescriptors;]=]
+    [=[    std::map<std::string, Renderer::TextureSamplerDescriptor> prefixedRandomTextures;
+    std::map<int, Renderer::TextureSamplerDescriptor> randomTextureDescriptors;]=]
+)
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+    [=[            if (randomSlot >= 0 && randomSlot <= 15)
+            {]=]
+    [=[            if (randomSlot >= 0 && randomSlot <= 15)
+            {
+                // Two filename prefixes can deliberately share rand00. Cache
+                // each full unqualified name, while retaining the short slot
+                // alias for presets that reference rand00 without a prefix.
+                if (lowerCaseName.size() > 7 && lowerCaseName[6] == '_')
+                {
+                    auto found = presetState.prefixedRandomTextures.find(lowerCaseName);
+                    if (found == presetState.prefixedRandomTextures.end())
+                    {
+                        auto selected = presetState.renderContext.textureManager->GetRandomTexture(name);
+                        found = presetState.prefixedRandomTextures.emplace(lowerCaseName, selected).first;
+                        presetState.randomTextureDescriptors.emplace(randomSlot, selected);
+                    }
+                    const auto& selected = found->second;
+                    m_textureSamplerDescriptors.emplace_back(selected.Texture(),
+                        presetState.renderContext.textureManager->GetSampler(name), name, baseName);
+                    continue;
+                }]=]
+)
+
 patch_projectm_source(Renderer src/libprojectM/Renderer/TextureManager.cpp
     [=[    std::string lowerCaseName = Utils::ToLower(randomName);]=]
     [=[    std::string unqualifiedName;
