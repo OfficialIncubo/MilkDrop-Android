@@ -41,7 +41,7 @@ internal class PlaybackAudioSource(
                     record.release()
                     continue
                 }
-                val reader = PcmCaptureThread(record, record.channelCount, sink, preferLatest = true)
+                val reader = PcmCaptureThread(record, record.channelCount, sink)
                 try {
                     reader.start()
                     worker = reader

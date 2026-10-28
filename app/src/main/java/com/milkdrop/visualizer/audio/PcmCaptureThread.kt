@@ -9,15 +9,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Reads PCM16 frames from an already-built, unstarted [AudioRecord] on a dedicated thread.
  *
- * Reads are small (~5 ms of audio): each read blocks until it's full, so the read size is how
- * stale the newest audio can be and how often the visuals get any. Sizing it from
- * AudioRecord.getMinBufferSize (bytes, mistaken for samples) made it ~80 ms.
+ * Small reads deliver about 5 ms of continuous audio per block. The engine's rolling
+ * analysis buffers retain the latest window without dropping blocks here. Android's
+ * capture buffers and the render cadence still contribute to end-to-end latency.
  */
 internal class PcmCaptureThread(
     private val audioRecord: AudioRecord,
     private val channels: Int,
     private val sink: PcmSink,
-    private val preferLatest: Boolean = false,
 ) {
     private val running = AtomicBoolean(false)
     private var thread: Thread? = null
@@ -40,27 +39,18 @@ internal class PcmCaptureThread(
         }
         val readThread = Thread({
             val buffer = ShortArray(audioRecord.sampleRate / READS_PER_SECOND * channels)
-            // Size the catch-up budget from the recorder's actual queue. A finite
-            // budget prevents continuous input from keeping us in the drain loop.
-            val drainReads = (audioRecord.bufferSizeInFrames + buffer.size / channels - 1) /
-                (buffer.size / channels)
             try {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
                 while (running.get()) {
-                    var read = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                    val read = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
                     if (read < 0) {
                         if (running.get()) Log.w(TAG, "PCM capture failed: $read")
                         break
                     }
                     if (read > 0 && running.get()) {
-                        if (preferLatest) {
-                            for (attempt in 0 until drainReads) {
-                                if (!running.get()) break
-                                val newer = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
-                                if (newer <= 0) break
-                                read = newer
-                            }
-                        }
+                        // Feed every block in order. The engine keeps the newest
+                        // analysis window itself; skipping capture blocks creates
+                        // discontinuities and corrupts the waveform and FFT.
                         val frameCount = read / channels
                         if (running.get()) sink(buffer, frameCount, channels, audioRecord.sampleRate, false)
                     }
