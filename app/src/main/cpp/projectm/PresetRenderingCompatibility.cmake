@@ -220,3 +220,5 @@ std::shared_ptr<Renderer::Texture> FeedbackImage(Preset* preset) {
     return milkdrop ? milkdrop->FeedbackTexture() : preset->OutputTexture();
 }]=]
 )
+
+include(${CMAKE_CURRENT_LIST_DIR}/UndocumentedShaderFunctions.cmake)

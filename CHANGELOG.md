@@ -6,6 +6,11 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Extend undocumented HLSL shader functions with missing math, finite checks,
+  gradient noise and texture sampling variants. Correct vector derivative/classification
+  results, explicit 3D LOD sampling and ties-to-even rounding. See Docs/SHADER_FUNCTIONS.md
+  for texture target requirements and noise compatibility limits.
+
 - Engine information at the bottom of Settings, separated from the controls: live measured
   renderer FPS, patched projectM engine details, upstream version and the full commit used
   for the build. Refresh FPS only while Settings is visible and the app is in the foreground.
