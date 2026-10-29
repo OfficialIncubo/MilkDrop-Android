@@ -1,0 +1,6 @@
+MILKDROP_PRESET_VERSION=201
+PSVERSION=3
+PSVERSION_COMP=3
+[preset00]
+fWaveAlpha=0
+comp_1=`shader_body {float3 v=float3(.2,.4,.8); float1 e=1; ret=pow(v,e+e);}

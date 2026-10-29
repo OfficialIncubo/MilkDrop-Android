@@ -108,3 +108,36 @@ patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropPreset
     [=[const auto warpedImage = m_framebuffer.GetColorAttachmentTexture(m_previousFrameBuffer, 0);]=]
     [=[const auto warpedImage = m_framebuffer.GetColorAttachmentTexture(m_currentFrameBuffer, 0);]=]
 )
+
+# D3D distinguishes float1 (a one-component vector) from float (a scalar).
+# pow(float3, float1) truncates to float1; pow(float3, float) splats the scalar.
+# Losing this distinction turns Digital Sea's shared white detail into RGB bands.
+patch_projectm_copy(hlslparser vendor/hlslparser/src/HLSLTree.h
+    [=[        baseType    = _baseType;]=]
+    [=[        baseType    = _baseType;
+        oneComponentVector = false;]=]
+    [=[    HLSLBaseType        baseType;]=]
+    [=[    bool               oneComponentVector;
+    HLSLBaseType        baseType;]=]
+)
+patch_projectm_copy(hlslparser vendor/hlslparser/src/HLSLParser.cpp
+    [=[        type.baseType = HLSLBaseType_Float;
+        break;
+    case HLSLToken_Float2:]=]
+    [=[        type.baseType = HLSLBaseType_Float;
+        type.oneComponentVector = token == HLSLToken_Float1 || token == HLSLToken_Half1 || token == HLSLToken_Double1;
+        break;
+    case HLSLToken_Float2:]=]
+    [=[    result.typeName     = NULL;]=]
+    [=[    result.oneComponentVector = IsScalarType(result.baseType) &&
+        (type1.oneComponentVector || type2.oneComponentVector);
+    result.typeName     = NULL;]=]
+    [=[        const HLSLFunction* function = &_intrinsic[i].function;
+        if (String_Equal(function->name, name))]=]
+    [=[        const HLSLFunction* function = &_intrinsic[i].function;
+        if (String_Equal(name, "pow") && functionCall->numArguments == 2 &&
+            (functionCall->argument->expressionType.oneComponentVector ||
+             functionCall->argument->nextExpression->expressionType.oneComponentVector) &&
+            !IsScalarType(function->returnType.baseType)) continue;
+        if (String_Equal(function->name, name))]=]
+)

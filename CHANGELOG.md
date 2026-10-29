@@ -33,6 +33,10 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Preserve HLSL float1 vector semantics when resolving pow overloads. This restores
+  Digital Sea’s shared bright highlights instead of generating separate RGB bands,
+  while retaining component-wise pow for ordinary scalar exponents.
+
 - Add scalar/vector HLSL frexp support for Silicon Life, define zero-length
   normalization for feedback presets such as Normalyzer, and generate blur textures
   from the current post-warp frame to align composite lighting with BeatDrop.
