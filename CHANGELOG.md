@@ -4,6 +4,12 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Fixed
+
+- Use shape opacity independently of feedback texture alpha in legacy textured
+  drawing, matching BeatDrop's diffuse-alpha blend state. This restores presets
+  such as `shifter - swarm` that otherwise fade to black.
+
 ### Added
 
 - Extend undocumented HLSL shader functions with missing math, finite checks,

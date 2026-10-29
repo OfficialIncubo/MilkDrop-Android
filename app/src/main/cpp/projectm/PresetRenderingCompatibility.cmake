@@ -222,3 +222,13 @@ std::shared_ptr<Renderer::Texture> FeedbackImage(Preset* preset) {
 )
 
 include(${CMAKE_CURRENT_LIST_DIR}/UndocumentedShaderFunctions.cmake)
+
+# Legacy textured drawing uses D3DTSS_ALPHAOP=SELECTARG1 / D3DTA_DIFFUSE.
+# Multiplying by feedback alpha suppresses textured shapes as that alpha fades.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/PresetState.cpp
+    [=[#include "PresetState.hpp"]=]
+    [=[#include "PresetState.hpp"
+#include "LegacyTextureShader.hpp"]=]
+    [=[staticShaders->GetTexturedDrawFragmentShader());]=]
+    [=[milkdrop::LegacyTextureShader(staticShaders->GetTexturedDrawFragmentShader()));]=]
+)
