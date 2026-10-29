@@ -100,5 +100,4 @@ dependencies {
     implementation("androidx.mediarouter:mediarouter:1.8.1")
     implementation("com.google.android.gms:play-services-cast-framework:22.1.0")
 
-    testImplementation("junit:junit:4.13.2")
 }

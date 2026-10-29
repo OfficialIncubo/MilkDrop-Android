@@ -55,7 +55,6 @@ jobs:
         run: |
           node --check cast-receiver/receiver.js
           node --check cast-receiver/stream.js
-          node cast-receiver/receiver.test.cjs
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace

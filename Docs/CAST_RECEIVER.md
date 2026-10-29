@@ -60,9 +60,6 @@ real devices. Do not expose or port-forward the phone's stream server to the int
 
 ## Validation on receivers
 
-Run `node cast-receiver/receiver.test.cjs` for transport framing and receiver lifecycle
-tests. Android local unit tests cover MP4 box/timestamp invariants and encoding policy.
-
 Test at least the Philips TV, another recent Cast receiver, and an older receiver.
 Check rapid preset changes, complex presets, reconnects, Stop cast, screen rotation,
 background/foreground transitions and a slow or temporarily disconnected Wi-Fi link.
