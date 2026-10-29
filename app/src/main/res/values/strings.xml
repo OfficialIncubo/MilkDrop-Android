@@ -3,9 +3,9 @@
     <string name="engine_fps_value">%1$d FPS</string>
     <string name="engine_fps_measuring">Measuring FPS…</string>
     <string name="engine_live_info">%1$s ◉ projectM %2$s with MilkDrop patches</string>
-    <string name="engine_patch_info">Customized for MilkDrop with BeatDrop-compatible FFT and waveform shader functions, date/time and touch-pointer variables, shader and texture compatibility fixes, motion-vector corrections, preset timing controls, and rendering optimizations.</string>
+    <string name="engine_patch_info">MilkDrop uses a customized projectM engine to run MilkDrop presets. Its patches improve BeatDrop compatibility for waveforms, FFT shader functions, textures, preset variables and pixel alignment, and add date/time and touch input.</string>
     <string name="engine_upstream_info">Upstream master version: %1$s ◉ Commit:\n%2$s</string>
-    <string name="engine_snapshot_description">The version and full commit identify the upstream source used to build this APK. FPS measures the local visualizer renderer, not the receiving TV. The installed engine does not update automatically.</string>
+    <string name="engine_snapshot_description">FPS shows how many frames the visualizer renders each second; it may differ from the frame-rate setting and the TV’s playback rate. The version and commit identify the source bundled with this app, rather than the latest online release. Engine updates arrive with app updates.</string>
     <string name="cast_start">Cast</string>
     <string name="cast_live_device">%1$s (MilkDrop Live)</string>
     <string name="cast_receiving">Receiving visuals…</string>
@@ -57,7 +57,7 @@
     <string name="setting_additional_random">Additional random time</string>
     <string name="setting_transition_time">Transition time</string>
     <string-array name="preset_duration_options">
-        <item>10 s</item><item>15 s</item><item>20 s</item><item>25 s</item>
+        <item>5 s</item><item>10 s</item><item>15 s</item><item>20 s</item><item>25 s</item>
         <item>30 s</item><item>45 s</item><item>60 s</item>
     </string-array>
     <string-array name="additional_random_options">
@@ -65,17 +65,14 @@
         <item>20 s</item><item>25 s</item><item>30 s</item>
     </string-array>
     <string-array name="transition_time_options">
-        <item>Random</item><item>0.5 s</item><item>1 s</item><item>1.5 s</item>
+        <item>Random</item><item>0 s (Instant)</item><item>0.5 s</item><item>1 s</item><item>1.5 s</item>
         <item>1.7 s (default)</item><item>2 s</item><item>2.5 s</item><item>3 s</item><item>5 s</item>
     </string-array>
-    <string name="transition_random_description">Random chooses a new transition duration between 0.5 and 5 seconds for each preset change.</string>
+    <string name="transition_random_description">Instant switches presets without a fade. Random chooses a new fade duration between 0.5 and 5 seconds for each preset change.</string>
     <string name="duration_10">10 s</string>
     <string name="duration_15">15 s</string>
     <string name="duration_30">30 s</string>
     <string name="duration_60">60 s</string>
-    <string name="setting_transition">Transition</string>
-    <string name="transition_smooth">Smooth</string>
-    <string name="transition_instant">Instant</string>
     <string name="setting_frame_rate">Frame rate</string>
     <string-array name="frame_rate_options">
         <item>24 FPS</item><item>30 FPS</item><item>45 FPS</item><item>50 FPS</item>

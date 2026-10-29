@@ -33,6 +33,15 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Add scalar/vector HLSL frexp support for Silicon Life, define zero-length
+  normalization for feedback presets such as Normalyzer, and generate blur textures
+  from the current post-warp frame to align composite lighting with BeatDrop.
+
+- Combine Smooth/Instant into Transition time, with 0 s (Instant) after Random; add
+  a 5-second preset duration and preserve saved timing choices.
+- Turn off Stereo Internal audio and resume mono when screen-sharing consent is
+  cancelled or dismissed. Clarify the FPS and bundled engine information in Settings.
+
 - Preserve shader texture lookups following comments that mention a sampler, fixing
   the blank Rotated Radial Blur preset.
 - Align custom waves to D3D9 pixel centers so edge-drawn feedback presets, including

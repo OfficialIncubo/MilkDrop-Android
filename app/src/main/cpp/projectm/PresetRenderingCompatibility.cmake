@@ -91,3 +91,20 @@ static float PackedEchoChannel(float value)
     [=[gamma * m_shade[vertex][1],]=] [=[PackedEchoChannel(gamma * m_shade[vertex][1]),]=]
     [=[gamma * m_shade[vertex][2],]=] [=[PackedEchoChannel(gamma * m_shade[vertex][2]),]=]
 )
+
+# Keep legacy math intrinsics explicit on GLES feedback buffers.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+    [=[#include "MilkdropShader.hpp"]=]
+    [=[#include "MilkdropShader.hpp"
+#include "ShaderMathCompatibility.hpp"]=]
+    [=[    // Preprocess define macros]=]
+    [=[    program = milkdrop::CompatibleShaderMath(program);
+    // Preprocess define macros]=]
+)
+
+# BeatDrop blurs the current post-warp image before shapes and waves. Using the
+# previous frame misaligns composite bump-map derivatives with sampler_main.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropPreset.cpp
+    [=[const auto warpedImage = m_framebuffer.GetColorAttachmentTexture(m_previousFrameBuffer, 0);]=]
+    [=[const auto warpedImage = m_framebuffer.GetColorAttachmentTexture(m_currentFrameBuffer, 0);]=]
+)

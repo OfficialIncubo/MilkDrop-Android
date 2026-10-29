@@ -315,27 +315,6 @@
 
                 <TextView
                     style="@style/SettingLabel"
-                    android:labelFor="@id/groupTransition"
-                    android:text="@string/setting_transition" />
-
-                <RadioGroup
-                    android:id="@+id/groupTransition"
-                    style="@style/SegmentedGroup">
-
-                    <RadioButton
-                        android:id="@+id/transitionSmooth"
-                        style="@style/Segment"
-                        android:text="@string/transition_smooth" />
-
-                    <RadioButton
-                        android:id="@+id/transitionInstant"
-                        style="@style/Segment"
-                        android:text="@string/transition_instant" />
-
-                </RadioGroup>
-
-                <TextView
-                    style="@style/SettingLabel"
                     android:labelFor="@id/spinnerFrameRate"
                     android:text="@string/setting_frame_rate" />
 

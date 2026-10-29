@@ -30,10 +30,11 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_RANDOM_TIME, 0).takeIf { it in PresetTiming.additionalRandom } ?: 0
         set(value) = prefs.edit().putInt(KEY_RANDOM_TIME, value.takeIf { it in PresetTiming.additionalRandom } ?: 0).apply()
 
+    // Preserve the old Instant toggle until a duration is saved in the unified control.
     var transitionSeconds: Float
-        get() = prefs.getFloat(KEY_TRANSITION_TIME, 1.7f).takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f
+        get() = if (prefs.getBoolean(KEY_HARD_CUT, false)) 0f else prefs.getFloat(KEY_TRANSITION_TIME, 1.7f).takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f
         set(value) = prefs.edit().putFloat(KEY_TRANSITION_TIME,
-            value.takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f).apply()
+            value.takeIf { seconds -> PresetTiming.transitions.any { it == seconds } } ?: 1.7f).remove(KEY_HARD_CUT).apply()
 
     var beatCutsEnabled: Boolean
         get() = prefs.getBoolean(KEY_BEAT_CUTS, false)
@@ -42,10 +43,6 @@ class AppSettings(context: Context) {
     var showPresetNameDuringTransitions: Boolean
         get() = prefs.getBoolean(KEY_PRESET_NAME_TRANSITIONS, true)
         set(value) = prefs.edit().putBoolean(KEY_PRESET_NAME_TRANSITIONS, value).apply()
-
-    var hardCutEnabled: Boolean
-        get() = prefs.getBoolean(KEY_HARD_CUT, false)
-        set(value) = prefs.edit().putBoolean(KEY_HARD_CUT, value).apply()
 
     var fpsIndex: Int
         get() {

@@ -99,7 +99,6 @@ class MainActivity : AppCompatActivity() {
 
     private var autoAdvanceEnabled = true
     private var shuffleEnabled = true
-    private var hardCutEnabled = false
     private var presetDurationIndex = 1
     private var additionalRandomIndex = 0
     private var transitionTimeIndex = 3
@@ -164,6 +163,16 @@ class MainActivity : AppCompatActivity() {
     private val playbackConsentLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             playbackConsentPending = false
+            if (result.resultCode != RESULT_OK || result.data == null) {
+                settings.stereoInternalAudio = false
+                if (::binding.isInitialized) {
+                    val wasUpdating = updatingControls
+                    updatingControls = true
+                    binding.switchStereoInternalAudio.isChecked = false
+                    updatingControls = wasUpdating
+                }
+                if (::audioCaptureManager.isInitialized) releasePlaybackAudioSession()
+            }
             if (isDestroyed || receivingLive || settings.audioInput == AudioInput.MIC) return@registerForActivityResult
             val grant = result.data
             if (settings.stereoInternalAudio && result.resultCode == RESULT_OK && grant != null && Build.VERSION.SDK_INT >= 29) {
@@ -225,7 +234,6 @@ class MainActivity : AppCompatActivity() {
         ratings = PresetRatings(ratingsStore.loadFavourites(), ratingsStore.loadHidden(), ratingsStore::save)
         autoAdvanceEnabled = settings.autoAdvanceEnabled
         shuffleEnabled = settings.shuffleEnabled
-        hardCutEnabled = settings.hardCutEnabled
         presetDurationIndex = PresetTiming.durations.indexOf(settings.presetDurationSeconds)
         additionalRandomIndex = PresetTiming.additionalRandom.indexOf(settings.additionalRandomSeconds)
         transitionTimeIndex = PresetTiming.transitions.indexOfFirst { it == settings.transitionSeconds }
@@ -305,7 +313,6 @@ class MainActivity : AppCompatActivity() {
         configureTimingSpinner(binding.spinnerPresetDuration, R.array.preset_duration_options, presetDurationIndex)
         configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
         configureTimingSpinner(binding.spinnerTransitionTime, R.array.transition_time_options, transitionTimeIndex)
-        binding.groupTransition.check(if (hardCutEnabled) R.id.transitionInstant else R.id.transitionSmooth)
         configureTimingSpinner(binding.spinnerFrameRate, R.array.frame_rate_options, fpsIndex)
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
         binding.groupAudioSource.check(AUDIO_INPUT_BUTTON_IDS.getValue(settings.audioInput))
@@ -329,7 +336,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyRestoredRenderSettings() {
         surfaceView.milkDropRenderer.shuffleEnabled = shuffleEnabled
         surfaceView.milkDropRenderer.autoAdvanceEnabled = autoAdvanceEnabled
-        surfaceView.milkDropRenderer.instantTransitions = hardCutEnabled
+        surfaceView.milkDropRenderer.instantTransitions = settings.transitionSeconds == 0f
         surfaceView.milkDropRenderer.presetDurationSeconds = settings.presetDurationSeconds.toDouble()
         surfaceView.milkDropRenderer.additionalRandomSeconds = settings.additionalRandomSeconds.toDouble()
         surfaceView.milkDropRenderer.transitionSeconds = settings.transitionSeconds.toDouble()
@@ -911,13 +918,9 @@ class MainActivity : AppCompatActivity() {
             if (index != transitionTimeIndex) {
                 transitionTimeIndex = index
                 settings.transitionSeconds = PresetTiming.transitions[index]
+                surfaceView.milkDropRenderer.instantTransitions = settings.transitionSeconds == 0f
                 surfaceView.milkDropRenderer.transitionSeconds = settings.transitionSeconds.toDouble()
             }
-        }
-        binding.groupTransition.onUserSelection { id ->
-            hardCutEnabled = id == R.id.transitionInstant
-            settings.hardCutEnabled = hardCutEnabled
-            surfaceView.milkDropRenderer.instantTransitions = hardCutEnabled
         }
         binding.spinnerFrameRate.onUserSelection { index ->
             fpsIndex = index
