@@ -326,29 +326,140 @@
 
                 <TextView
                     style="@style/SettingLabel"
+                    android:labelFor="@id/sliderMeshSizeX"
+                    android:text="@string/setting_mesh_size" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="24dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mesh_size_x"
+                        android:textColor="@color/overlay_content_secondary"
+                        android:textSize="16sp" />
+
+                    <SeekBar
+                        android:id="@+id/sliderMeshSizeX"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:max="300"
+                        android:min="8"
+                        android:progress="32" />
+
+                    <EditText
+                        android:id="@+id/inputMeshSizeX"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:gravity="center"
+                        android:imeOptions="actionDone"
+                        android:inputType="number"
+                        android:selectAllOnFocus="true"
+                        android:text="32"
+                        android:textColor="@color/overlay_content"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="24dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/mesh_size_y"
+                        android:textColor="@color/overlay_content_secondary"
+                        android:textSize="16sp" />
+
+                    <SeekBar
+                        android:id="@+id/sliderMeshSizeY"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:max="300"
+                        android:min="8"
+                        android:progress="24" />
+
+                    <EditText
+                        android:id="@+id/inputMeshSizeY"
+                        android:layout_width="64dp"
+                        android:layout_height="48dp"
+                        android:gravity="center"
+                        android:imeOptions="actionDone"
+                        android:inputType="number"
+                        android:selectAllOnFocus="true"
+                        android:text="24"
+                        android:textColor="@color/overlay_content"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_size_description"
+                    android:textColor="@color/overlay_content_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    style="@style/SettingLabel"
                     android:labelFor="@id/groupQuality"
                     android:text="@string/setting_quality" />
 
                 <RadioGroup
                     android:id="@+id/groupQuality"
-                    style="@style/SegmentedGroup">
+                    style="@style/SegmentedGroup"
+                    android:orientation="vertical">
+
+                    <RadioButton
+                        android:id="@+id/qualityAuto"
+                        style="@style/QualitySegment"
+                        android:text="@string/quality_auto" />
+
+                    <RadioButton
+                        android:id="@+id/qualityVeryLow"
+                        style="@style/QualitySegment"
+                        android:text="@string/quality_very_low" />
 
                     <RadioButton
                         android:id="@+id/qualityLow"
-                        style="@style/Segment"
+                        style="@style/QualitySegment"
                         android:text="@string/quality_low" />
 
                     <RadioButton
                         android:id="@+id/qualityMedium"
-                        style="@style/Segment"
+                        style="@style/QualitySegment"
                         android:text="@string/quality_medium" />
 
                     <RadioButton
                         android:id="@+id/qualityHigh"
-                        style="@style/Segment"
+                        style="@style/QualitySegment"
                         android:text="@string/quality_high" />
 
+                    <RadioButton
+                        android:id="@+id/qualityVeryHigh"
+                        style="@style/QualitySegment"
+                        android:text="@string/quality_very_high" />
+
+                    <RadioButton
+                        android:id="@+id/qualityUltraHigh"
+                        style="@style/QualitySegment"
+                        android:text="@string/quality_ultra_high" />
+
                 </RadioGroup>
+
+                <TextView
+                    android:id="@+id/qualityDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/overlay_content_secondary"
+                    android:textSize="13sp" />
 
                 <TextView
                     style="@style/SettingLabel"

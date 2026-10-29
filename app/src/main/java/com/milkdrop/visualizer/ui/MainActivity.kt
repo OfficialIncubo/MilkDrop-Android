@@ -20,6 +20,8 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioGroup
@@ -119,6 +121,9 @@ class MainActivity : AppCompatActivity() {
     private var searchGeneration = 0
     private var fpsIndex = 0
     private var qualityIndex = 0
+    private var adaptiveQualityIndex = QUALITY_ULTRA_HIGH
+    private var lowFpsSamples = 0
+    private var highFpsSamples = 0
     private var resumeAutomaticAudio = false
     private var graphicsBlocked = false
     private var remoteNavigation = false
@@ -249,6 +254,9 @@ class MainActivity : AppCompatActivity() {
                 setStatusMessage(R.string.visualization_initialization_failed)
             }
         }
+        surfaceView.milkDropRenderer.onFrameRateMeasured = { fps ->
+            runOnUiThread { onMeasuredRenderFps(fps) }
+        }
         binding.surfaceContainer.addView(surfaceView)
         applyRestoredRenderSettings()
 
@@ -316,6 +324,10 @@ class MainActivity : AppCompatActivity() {
         configureTimingSpinner(binding.spinnerTransitionTime, R.array.transition_time_options, transitionTimeIndex)
         configureTimingSpinner(binding.spinnerFrameRate, R.array.frame_rate_options, fpsIndex)
         binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
+        binding.sliderMeshSizeX.progress = settings.meshColumns
+        binding.sliderMeshSizeY.progress = settings.meshRows
+        binding.inputMeshSizeX.setText(settings.meshColumns.toString())
+        binding.inputMeshSizeY.setText(settings.meshRows.toString())
         binding.groupAudioSource.check(AUDIO_INPUT_BUTTON_IDS.getValue(settings.audioInput))
         binding.switchStereoInternalAudio.isChecked = settings.stereoInternalAudio
         binding.switchStereoInternalAudio.isEnabled = Build.VERSION.SDK_INT >= 29
@@ -346,13 +358,70 @@ class MainActivity : AppCompatActivity() {
         surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
         surfaceView.milkDropRenderer.fftShaderScaling = settings.fftShaderScaling
         surfaceView.milkDropRenderer.fftShaderNoiseFloor = settings.fftShaderNoiseFloor
+        surfaceView.milkDropRenderer.meshSize = MeshSize(settings.meshColumns, settings.meshRows)
         applyFrameRate()
         applyQuality()
     }
 
-    private fun applyQuality() {
-        surfaceView.setResolutionScale(QUALITY_SCALES[qualityIndex])
-        surfaceView.milkDropRenderer.meshSize = QUALITY_MESH_SIZES[qualityIndex]
+    private fun applyQuality(resetAutomaticLevel: Boolean = true) {
+        if (qualityIndex == QUALITY_AUTO && resetAutomaticLevel) {
+            adaptiveQualityIndex = QUALITY_ULTRA_HIGH
+            lowFpsSamples = 0
+            highFpsSamples = 0
+        }
+        surfaceView.setResolutionScale(QUALITY_SCALES[effectiveQualityIndex()])
+        updateQualityDescription()
+    }
+
+    private fun effectiveQualityIndex(): Int =
+        if (qualityIndex == QUALITY_AUTO) adaptiveQualityIndex else qualityIndex
+
+    private fun updateQualityDescription() {
+        val effective = effectiveQualityIndex()
+        val qualityName = getString(QUALITY_NAME_IDS[effective])
+        val percent = (QUALITY_SCALES[effective] * 100).roundToInt()
+        binding.qualityDescription.text = if (qualityIndex == QUALITY_AUTO) {
+            getString(R.string.quality_auto_description, qualityName, percent)
+        } else {
+            getString(R.string.quality_fixed_description, qualityName, percent)
+        }
+    }
+
+    private fun onMeasuredRenderFps(fps: Int) {
+        if (qualityIndex != QUALITY_AUTO || fps <= 0 || isDestroyed) return
+        val target = expectedRenderFps()
+        when {
+            fps < (target * AUTO_QUALITY_DOWNGRADE_THRESHOLD).roundToInt() -> {
+                lowFpsSamples++
+                highFpsSamples = 0
+                if (lowFpsSamples >= AUTO_QUALITY_DOWNGRADE_SAMPLES && adaptiveQualityIndex > QUALITY_VERY_LOW) {
+                    adaptiveQualityIndex--
+                    lowFpsSamples = 0
+                    surfaceView.setResolutionScale(QUALITY_SCALES[adaptiveQualityIndex])
+                    updateQualityDescription()
+                }
+            }
+            fps >= (target * AUTO_QUALITY_UPGRADE_THRESHOLD).roundToInt() -> {
+                highFpsSamples++
+                lowFpsSamples = 0
+                if (highFpsSamples >= AUTO_QUALITY_UPGRADE_SAMPLES && adaptiveQualityIndex < QUALITY_ULTRA_HIGH) {
+                    adaptiveQualityIndex++
+                    highFpsSamples = 0
+                    surfaceView.setResolutionScale(QUALITY_SCALES[adaptiveQualityIndex])
+                    updateQualityDescription()
+                }
+            }
+            else -> {
+                lowFpsSamples = 0
+                highFpsSamples = 0
+            }
+        }
+    }
+
+    private fun expectedRenderFps(): Int {
+        val configured = surfaceView.targetFps
+        val displayRate = (surfaceView.display?.refreshRate ?: 60f).roundToInt().coerceAtLeast(24)
+        return if (configured == 0) displayRate else minOf(configured, displayRate)
     }
 
     /**
@@ -752,6 +821,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (::surfaceView.isInitialized) surfaceView.milkDropRenderer.onFrameRateMeasured = null
         tvReceiver?.close(); tvReceiver = null
         castingController?.close()
         castingController = null
@@ -871,6 +941,7 @@ class MainActivity : AppCompatActivity() {
         }
         listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchPresetNameDuringTransitions,
             binding.switchScreenDependentRendering, binding.switchStereoInternalAudio, binding.switchSwipeGestures, binding.resetAudioSensitivity,
+            binding.sliderMeshSizeX, binding.sliderMeshSizeY, binding.inputMeshSizeX, binding.inputMeshSizeY,
             binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {
             it.setBackgroundResource(R.drawable.remote_focus_background)
         }
@@ -929,10 +1000,18 @@ class MainActivity : AppCompatActivity() {
             applyFrameRate()
         }
         binding.groupQuality.onUserSelection { id ->
-            qualityIndex = QUALITY_BUTTON_IDS.indexOf(id)
+            qualityIndex = QUALITY_BUTTON_IDS.indexOf(id).takeIf { it >= 0 } ?: return@onUserSelection
             settings.qualityIndex = qualityIndex
             applyQuality()
         }
+        binding.sliderMeshSizeX.onUserProgress { columns ->
+            applyMeshSize(columns = columns)
+        }
+        binding.sliderMeshSizeY.onUserProgress { rows ->
+            applyMeshSize(rows = rows)
+        }
+        setupMeshSizeInput(binding.inputMeshSizeX) { columns -> applyMeshSize(columns = columns) }
+        setupMeshSizeInput(binding.inputMeshSizeY) { rows -> applyMeshSize(rows = rows) }
         binding.switchStereoInternalAudio.setOnCheckedChangeListener { _, checked ->
             if (updatingControls) return@setOnCheckedChangeListener
             settings.stereoInternalAudio = checked
@@ -975,6 +1054,43 @@ class MainActivity : AppCompatActivity() {
         binding.fftShaderNoiseFloorLabel.text = getString(R.string.fft_shader_noise_floor_value, settings.fftShaderNoiseFloor)
     }
 
+    private fun applyMeshSize(
+        columns: Int = settings.meshColumns,
+        rows: Int = settings.meshRows,
+    ) {
+        val boundedColumns = columns.coerceIn(MESH_SIZE_MIN, MESH_SIZE_MAX)
+        val boundedRows = rows.coerceIn(MESH_SIZE_MIN, MESH_SIZE_MAX)
+        settings.meshColumns = boundedColumns
+        settings.meshRows = boundedRows
+        surfaceView.milkDropRenderer.meshSize = MeshSize(boundedColumns, boundedRows)
+        syncMeshSizeControls(boundedColumns, boundedRows)
+    }
+
+    /** Keeps sliders and editable values together without disrupting an in-progress numeric edit. */
+    private fun syncMeshSizeControls(columns: Int, rows: Int) {
+        val wasUpdating = updatingControls
+        updatingControls = true
+        binding.sliderMeshSizeX.progress = columns
+        binding.sliderMeshSizeY.progress = rows
+        if (!binding.inputMeshSizeX.hasFocus()) binding.inputMeshSizeX.setText(columns.toString())
+        if (!binding.inputMeshSizeY.hasFocus()) binding.inputMeshSizeY.setText(rows.toString())
+        updatingControls = wasUpdating
+    }
+
+    private fun setupMeshSizeInput(input: EditText, apply: (Int) -> Unit) {
+        fun commit() {
+            val value = input.text.toString().toIntOrNull()?.coerceIn(MESH_SIZE_MIN, MESH_SIZE_MAX)
+            apply(value ?: if (input === binding.inputMeshSizeX) settings.meshColumns else settings.meshRows)
+        }
+        input.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) commit() }
+        input.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId != EditorInfo.IME_ACTION_DONE) return@setOnEditorActionListener false
+            commit()
+            input.clearFocus()
+            true
+        }
+    }
+
     private fun SeekBar.onUserProgress(action: (Int) -> Unit) {
         keyProgressIncrement = 1
         setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1007,6 +1123,7 @@ class MainActivity : AppCompatActivity() {
             // to 24/30 Hz. Android still makes the final choice based on device policy.
             preferredRefreshRate = if (fps == 0) highest else if (fps > 60) fps.toFloat() else 0f
         }
+        if (qualityIndex == QUALITY_AUTO) applyQuality()
     }
 
     private fun Spinner.onUserSelection(action: (Int) -> Unit) {
@@ -1388,11 +1505,30 @@ class MainActivity : AppCompatActivity() {
 
         // 0 = uncapped ("Max"). Index 0 (30fps) is the default performance-friendly setting.
 
-        // Fraction of native resolution to render at; lower cuts fragment shader cost for heavy presets.
-        val QUALITY_SCALES = floatArrayOf(1.0f, 0.75f, 0.5f)
-        // Coarser warp mesh at Low: fewer per-vertex equation evaluations on the CPU each frame.
-        val QUALITY_MESH_SIZES = arrayOf(MeshSize.DEFAULT, MeshSize.DEFAULT, MeshSize(24, 18))
-        val QUALITY_BUTTON_IDS = intArrayOf(R.id.qualityHigh, R.id.qualityMedium, R.id.qualityLow)
+        // Quality affects the output buffer only. Per-point warp mesh density remains user-controlled.
+        const val QUALITY_AUTO = 0
+        const val QUALITY_VERY_LOW = 1
+        const val QUALITY_LOW = 2
+        const val QUALITY_MEDIUM = 3
+        const val QUALITY_HIGH = 4
+        const val QUALITY_VERY_HIGH = 5
+        const val QUALITY_ULTRA_HIGH = 6
+        val QUALITY_SCALES = floatArrayOf(1.0f, 0.35f, 0.50f, 0.65f, 0.80f, 0.90f, 1.0f)
+        val QUALITY_BUTTON_IDS = intArrayOf(
+            R.id.qualityAuto, R.id.qualityVeryLow, R.id.qualityLow, R.id.qualityMedium,
+            R.id.qualityHigh, R.id.qualityVeryHigh, R.id.qualityUltraHigh,
+        )
+        val QUALITY_NAME_IDS = intArrayOf(
+            R.string.quality_auto, R.string.quality_very_low, R.string.quality_low,
+            R.string.quality_medium, R.string.quality_high, R.string.quality_very_high,
+            R.string.quality_ultra_high,
+        )
+        const val MESH_SIZE_MIN = 8
+        const val MESH_SIZE_MAX = 300
+        const val AUTO_QUALITY_DOWNGRADE_THRESHOLD = 0.82f
+        const val AUTO_QUALITY_UPGRADE_THRESHOLD = 0.95f
+        const val AUTO_QUALITY_DOWNGRADE_SAMPLES = 2
+        const val AUTO_QUALITY_UPGRADE_SAMPLES = 4
 
         val AUDIO_INPUT_BUTTON_IDS = mapOf(
             AudioInput.MIC to R.id.audioSourceMic,

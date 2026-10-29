@@ -26,15 +26,25 @@ internal class VisualizationTouchListener(
     private var shortcutsAllowed = false
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
-        // Keep mouse clicks on the ordinary View click path.
-        if (!event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN)) return false
+        val isTouch = event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN)
+        val isMouse = event.isFromSource(InputDevice.SOURCE_MOUSE)
+        if (!isTouch && !isMouse) return false
+
+        // A mouse drag used to fall through to View.performClick(), which toggled the controls
+        // when the primary button was released. Treat it as the same stationary-click gesture as
+        // touch, but do not map mouse drags to the touchscreen shortcut swipes.
+        if (isMouse && event.actionMasked == MotionEvent.ACTION_DOWN &&
+            event.actionButton != MotionEvent.BUTTON_PRIMARY &&
+            event.buttonState and MotionEvent.BUTTON_PRIMARY == 0
+        ) return false
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 startX = event.x
                 startY = event.y
                 maxTravel = 0f
                 multiplePointers = event.pointerCount != 1
-                shortcutsAllowed = canSwipe()
+                shortcutsAllowed = !isMouse && canSwipe()
                 tracking = true
                 view.isPressed = true
             }

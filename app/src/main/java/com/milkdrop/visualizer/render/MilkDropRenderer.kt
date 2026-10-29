@@ -191,6 +191,10 @@ class MilkDropRenderer(
     private var reportedFps = 0
     @Volatile private var frameRateReading: Pair<Int, Long>? = null
 
+    /** Receives one measured-FPS sample at a time; listeners must move UI work to the main thread. */
+    @Volatile
+    var onFrameRateMeasured: ((fps: Int) -> Unit)? = null
+
     /** Measured render FPS, rather than the configured cap; stale readings show a stopped renderer. */
     fun currentFramesPerSecond(): Int? = frameRateReading?.let { (fps, sampledAt) ->
         if (System.nanoTime() - sampledAt > 1_500_000_000L) 0 else fps
@@ -279,6 +283,7 @@ class MilkDropRenderer(
     private fun reportFrameRate(nowNanos: Long) {
         val fps = frameRateMeter.onFrame(nowNanos) ?: return
         frameRateReading = fps to nowNanos
+        onFrameRateMeasured?.invoke(fps)
         if (fps != reportedFps && handle != 0L) {
             ProjectMBridge.nativeSetFps(handle, fps)
             reportedFps = fps

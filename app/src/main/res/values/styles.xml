@@ -74,4 +74,10 @@
         <item name="android:textColor">@color/segment_content</item>
         <item name="android:background">@drawable/segment_background</item>
     </style>
+
+    <!-- Long quality labels remain readable on phones, tablets, and TV displays. -->
+    <style name="QualitySegment" parent="Segment">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">0</item>
+    </style>
 </resources>

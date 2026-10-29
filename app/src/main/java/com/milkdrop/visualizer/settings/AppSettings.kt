@@ -1,14 +1,12 @@
 package com.milkdrop.visualizer.settings
 
 import android.content.Context
-import android.app.ActivityManager
 import com.milkdrop.visualizer.audio.AudioInput
 
 /** Persists the overlay's toggle states (everything except momentary actions like Media) and the last preset across launches. */
 class AppSettings(context: Context) {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val defaultQualityIndex = if (context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true) 2 else 0
 
     var swipeGesturesEnabled: Boolean
         get() = prefs.getBoolean("swipe_gestures_enabled", true)
@@ -61,8 +59,36 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_SCREEN_DEPENDENT_RENDERING, value).apply()
 
     var qualityIndex: Int
-        get() = prefs.getInt(KEY_QUALITY_INDEX, defaultQualityIndex)
-        set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX, value).apply()
+        get() {
+            if (!prefs.contains(KEY_QUALITY_INDEX)) return QUALITY_AUTO
+            val stored = prefs.getInt(KEY_QUALITY_INDEX, QUALITY_AUTO)
+            if (prefs.getInt(KEY_QUALITY_SCHEMA, 1) < QUALITY_SCHEMA_VERSION) {
+                // The previous three entries were High, Medium and Low respectively. Keep that
+                // intent when moving to the expanded quality list instead of silently changing
+                // existing installations to Auto.
+                val migrated = when (stored.coerceIn(0, 2)) {
+                    0 -> QUALITY_VERY_HIGH
+                    1 -> QUALITY_MEDIUM
+                    else -> QUALITY_LOW
+                }
+                prefs.edit().putInt(KEY_QUALITY_INDEX, migrated)
+                    .putInt(KEY_QUALITY_SCHEMA, QUALITY_SCHEMA_VERSION).apply()
+                return migrated
+            }
+            return stored.coerceIn(QUALITY_AUTO, QUALITY_ULTRA_HIGH)
+        }
+        set(value) = prefs.edit().putInt(KEY_QUALITY_INDEX,
+            value.coerceIn(QUALITY_AUTO, QUALITY_ULTRA_HIGH))
+            .putInt(KEY_QUALITY_SCHEMA, QUALITY_SCHEMA_VERSION).apply()
+
+    /** Per-point mesh dimensions are deliberately separate from the output-resolution quality. */
+    var meshColumns: Int
+        get() = prefs.getInt(KEY_MESH_COLUMNS, DEFAULT_MESH_COLUMNS).coerceIn(MIN_MESH_SIZE, MAX_MESH_SIZE)
+        set(value) = prefs.edit().putInt(KEY_MESH_COLUMNS, value.coerceIn(MIN_MESH_SIZE, MAX_MESH_SIZE)).apply()
+
+    var meshRows: Int
+        get() = prefs.getInt(KEY_MESH_ROWS, DEFAULT_MESH_ROWS).coerceIn(MIN_MESH_SIZE, MAX_MESH_SIZE)
+        set(value) = prefs.edit().putInt(KEY_MESH_ROWS, value.coerceIn(MIN_MESH_SIZE, MAX_MESH_SIZE)).apply()
 
     var audioSensitivity: Float
         get() = AudioTuning.bounded(prefs.getFloat(KEY_AUDIO_SENSITIVITY, AudioTuning.SENSITIVITY_DEFAULT),
@@ -118,6 +144,9 @@ class AppSettings(context: Context) {
         const val KEY_FPS_INDEX = "fps_index"
         const val KEY_FPS_VALUE = "frames_per_second"
         const val KEY_QUALITY_INDEX = "quality_index"
+        const val KEY_QUALITY_SCHEMA = "quality_schema"
+        const val KEY_MESH_COLUMNS = "mesh_columns"
+        const val KEY_MESH_ROWS = "mesh_rows"
         const val KEY_AUDIO_SENSITIVITY = "audio_sensitivity"
         const val KEY_FFT_SCALING = "fft_shader_scaling"
         const val KEY_FFT_NOISE_FLOOR = "fft_shader_noise_floor"
@@ -125,5 +154,16 @@ class AppSettings(context: Context) {
         const val KEY_AUDIO_SOURCE_INTERNAL = "audio_source_internal"
         const val KEY_AUDIO_INPUT = "audio_input"
         const val KEY_LAST_PRESET_PATH = "last_preset_path"
+
+        const val QUALITY_AUTO = 0
+        const val QUALITY_LOW = 2
+        const val QUALITY_MEDIUM = 3
+        const val QUALITY_VERY_HIGH = 5
+        const val QUALITY_ULTRA_HIGH = 6
+        const val QUALITY_SCHEMA_VERSION = 2
+        const val MIN_MESH_SIZE = 8
+        const val MAX_MESH_SIZE = 300
+        const val DEFAULT_MESH_COLUMNS = 32
+        const val DEFAULT_MESH_ROWS = 24
     }
 }
