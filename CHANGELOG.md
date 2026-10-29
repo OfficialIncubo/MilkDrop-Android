@@ -33,6 +33,12 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Support shader all/any reductions for Domains and mipmapped disk textures for
+  Heartfelt’s focus blur. Retain sampler wrap/filter modes and owned GPU lifetimes.
+- Match BeatDrop’s actual previous-feedback blur input, correcting the earlier
+  post-warp interpretation, and pass raw feedback between presets so Normalyzer
+  does not inherit the previous composite’s bright background.
+
 - Preserve HLSL float1 vector semantics when resolving pow overloads. This restores
   Digital Sea’s shared bright highlights instead of generating separate RGB bands,
   while retaining component-wise pow for ordinary scalar exponents.

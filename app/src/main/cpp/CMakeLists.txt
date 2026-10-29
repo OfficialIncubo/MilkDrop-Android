@@ -112,6 +112,9 @@ endfunction()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/projectm/BeatAnalysis.cmake)
 
+# Mirror renderer headers before extending texture/sampler layouts.
+mirror_projectm_dir(Renderer src/libprojectM/Renderer)
+
 # hlslparser's headers get patched below, and MilkdropShader.cpp includes them too (through the
 # PUBLIC include dir this prepends), so every user sees the same class layout.
 mirror_projectm_dir(hlslparser vendor/hlslparser/src)
