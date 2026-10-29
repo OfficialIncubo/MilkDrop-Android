@@ -33,6 +33,12 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Preserve shader texture lookups following comments that mention a sampler, fixing
+  the blank Rotated Radial Blur preset.
+- Align custom waves to D3D9 pixel centers so edge-drawn feedback presets, including
+  PieturP's stripes presets, render correctly on GLES.
+- Support random texture slots 00–99, including the texture distortion and smoke
+  used by the Chaotic and Epic Laser Beams remix.
 - Show Cast/Stop cast only alongside the sidebar controls, retaining the Settings/preset-list
   visibility rules. Replace the connecting spinner with an animated cast signal icon and
   stop its animation whenever the button is hidden or the app is paused.

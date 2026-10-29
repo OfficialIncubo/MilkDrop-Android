@@ -1,3 +1,23 @@
+# Declaration cleanup must never match words inside comments. In particular,
+# "// apply the main sampler" used to consume the following texture lookup,
+# because the declaration regex permits a newline after the word sampler.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+    [=[    // Remove previous shader declarations]=]
+    [=[    sourcePreprocessed = Utils::StripComments(sourcePreprocessed);
+
+    // Remove previous shader declarations]=]
+)
+
+# D3D9 places pixel centers at integer coordinates; GLES uses half integers.
+# Translate custom waves by half a framebuffer pixel so a wave at x=0 lands
+# on the first column rather than outside its line rasterization coverage.
+patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/CustomWaveform.cpp
+    [=[* m_presetState.renderContext.invAspectX),]=]
+    [=[* m_presetState.renderContext.invAspectX + 1.0 / m_presetState.renderContext.viewportSizeX),]=]
+    [=[* m_presetState.renderContext.invAspectY));]=]
+    [=[* m_presetState.renderContext.invAspectY - 1.0 / m_presetState.renderContext.viewportSizeY));]=]
+)
+
 # HLSL promotes the two branches of a conditional before assigning its result.
 patch_projectm_copy(hlslparser vendor/hlslparser/src/HLSLParser.cpp
     [=[            conditionalExpression->expressionType  = expression1->expressionType;]=]
@@ -19,6 +39,7 @@ patch_projectm_copy(hlslparser vendor/hlslparser/src/GLSLGenerator.cpp
 # BeatDrop resolves random slots separately for each compiled shader. Preserve
 # slot and prefix aliases within that stage, without coupling warp to composite.
 patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader.cpp
+    [=[randomSlot <= 15]=] [=[randomSlot <= 99]=]
     [=[    std::locale loc;]=]
     [=[    std::locale loc;
     std::map<int, Renderer::TextureSamplerDescriptor> randomTextureDescriptors;
