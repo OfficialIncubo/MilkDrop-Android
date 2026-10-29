@@ -35,7 +35,7 @@ patch_projectm_source(projectM_main src/libprojectM/TimeKeeper.cpp
     [=[double TimeKeeper::SampledTransitionDuration()
 {
     if (m_softCutDuration >= 0.0) return m_softCutDuration;
-    constexpr double choices[]{0.5, 1.0, 1.5, 1.7, 2.0, 2.5, 3.0, 5.0};
+    constexpr double choices[]{0, 0.5, 1.0, 1.5, 1.7, 2.0, 2.5, 3.0, 5.0};
     std::uniform_int_distribution<int> choose(0, sizeof(choices) / sizeof(choices[0]) - 1);
     return choices[choose(m_randomGenerator)];
 }
