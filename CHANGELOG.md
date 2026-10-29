@@ -19,6 +19,9 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Added
 
+- Extend equation and warp/composite shader q variables to q1–q64, with packed
+  shader banks _qa–_qp, including custom shape and waveform contexts.
+
 - Extend undocumented HLSL shader functions with missing math, finite checks,
   gradient noise and texture sampling variants. Correct vector derivative/classification
   results, explicit 3D LOD sampling and ties-to-even rounding. See Docs/SHADER_FUNCTIONS.md

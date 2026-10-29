@@ -232,3 +232,5 @@ patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/PresetState.cp
     [=[staticShaders->GetTexturedDrawFragmentShader());]=]
     [=[milkdrop::LegacyTextureShader(staticShaders->GetTexturedDrawFragmentShader()));]=]
 )
+
+include(${CMAKE_CURRENT_LIST_DIR}/QVariables.cmake)
