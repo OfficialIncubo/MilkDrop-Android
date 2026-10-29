@@ -29,7 +29,7 @@ public:
         const double normalizedY = values.mouseY < 0.0f ? -1.0 : 1.0 - values.mouseY;
         const double data[] = {
             values.mouseX, normalizedY, values.down ? 1.0 : 0.0,
-            values.released ? 1.0 : 0.0, static_cast<double>(values.year),
+            values.pressed ? 1.0 : 0.0, static_cast<double>(values.year),
             static_cast<double>(values.month), static_cast<double>(values.day),
             static_cast<double>(values.weekday), static_cast<double>(values.hour),
             static_cast<double>(values.minute), static_cast<double>(values.second),

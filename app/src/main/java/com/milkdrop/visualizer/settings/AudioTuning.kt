@@ -3,7 +3,7 @@ package com.milkdrop.visualizer.settings
 /** Slider limits and defaults shared by persistence and rendering. */
 object AudioTuning {
     const val SENSITIVITY_DEFAULT = 1.0f
-    const val SENSITIVITY_MAX = 10.0f
+    const val SENSITIVITY_MAX = 25.0f
     const val FFT_SCALING_DEFAULT = 0.45f
     const val FFT_SCALING_MAX = 2.0f
     const val FFT_NOISE_FLOOR_DEFAULT = 0.10f

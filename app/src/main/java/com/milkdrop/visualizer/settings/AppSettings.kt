@@ -10,6 +10,10 @@ class AppSettings(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val defaultQualityIndex = if (context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true) 2 else 0
 
+    var swipeGesturesEnabled: Boolean
+        get() = prefs.getBoolean("swipe_gestures_enabled", true)
+        set(value) = prefs.edit().putBoolean("swipe_gestures_enabled", value).apply()
+
     var shuffleEnabled: Boolean
         get() = prefs.getBoolean(KEY_SHUFFLE, true)
         set(value) = prefs.edit().putBoolean(KEY_SHUFFLE, value).apply()

@@ -122,7 +122,7 @@ patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/MilkdropShader
     const auto& input = presetState.renderContext.shaderInputs;
     m_shader.SetUniformFloat4("_milkdrop_pointer", {input.mouseX, input.mouseY,
         input.down ? input.clickX : -input.clickX,
-        input.released ? input.clickY : -input.clickY});
+        input.pressed ? input.clickY : -input.clickY});
     m_shader.SetUniformFloat4("_milkdrop_sys_time", {input.hour, input.minute,
         input.second, static_cast<float>(input.totalSeconds)});
     m_shader.SetUniformFloat4("_milkdrop_sys_date", {input.year, input.month,

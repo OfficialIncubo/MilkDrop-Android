@@ -14,7 +14,7 @@ struct ShaderInputValues
     float clickX{0.0f};
     float clickY{0.0f};
     bool down{false};
-    bool released{false};
+    bool pressed{false};
     int year{}, month{}, day{}, weekday{};
     int hour{}, minute{}, second{}, milliseconds{};
     double totalSeconds{};
@@ -29,20 +29,14 @@ public:
         UpdateClock(m_values);
     }
 
-    void SetPointer(float x, float y, bool down, bool released)
+    void SetPointer(float x, float y, bool down, bool pressed)
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
         const bool inside = std::isfinite(x) && std::isfinite(y) &&
                             x >= 0.0f && x <= 1.0f && y >= 0.0f && y <= 1.0f;
         m_values.mouseX = inside ? x : -1.0f;
         m_values.mouseY = inside ? y : -1.0f;
-        if (inside && down && !m_values.down)
-        {
-            m_values.clickX = x;
-            m_values.clickY = y;
-        }
-        // Very short taps can begin and end between rendered frames.
-        if (inside && released && !m_values.down && !down)
+        if (inside && pressed)
         {
             m_values.clickX = x;
             m_values.clickY = y;
@@ -50,8 +44,8 @@ public:
         m_values.down = down;
         // The app submits one pointer snapshot before applying queued preset changes.
         // Clear the preceding frame's pulse so init code cannot observe it again.
-        m_values.released = false;
-        m_pendingRelease = m_pendingRelease || released;
+        m_values.pressed = false;
+        m_pendingPress = m_pendingPress || pressed;
         UpdateClock(m_values);
     }
 
@@ -59,8 +53,8 @@ public:
     void BeginFrame()
     {
         const std::lock_guard<std::mutex> lock(m_mutex);
-        m_values.released = m_pendingRelease;
-        m_pendingRelease = false;
+        m_values.pressed = m_pendingPress;
+        m_pendingPress = false;
         UpdateClock(m_values);
     }
 
@@ -69,7 +63,7 @@ public:
         const std::lock_guard<std::mutex> lock(m_mutex);
         auto result = m_values;
         // Preset initialization can happen before the first rendered frame.
-        result.released = result.released || m_pendingRelease;
+        result.pressed = result.pressed || m_pendingPress;
         return result;
     }
 
@@ -102,7 +96,7 @@ private:
     }
     std::mutex m_mutex;
     ShaderInputValues m_values;
-    bool m_pendingRelease{false};
+    bool m_pendingPress{false};
 };
 
 } // namespace milkdrop

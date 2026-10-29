@@ -155,9 +155,9 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetShaderAudioSettings(
 
 JNIEXPORT void JNICALL
 Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeSetPointer(
-        JNIEnv*, jobject, jlong handlePtr, jfloat x, jfloat y, jboolean down, jboolean released) {
+        JNIEnv*, jobject, jlong handlePtr, jfloat x, jfloat y, jboolean down, jboolean pressed) {
     SafeCall([&] { milkdrop_set_pointer(AsHandle(handlePtr)->projectM, x, y,
-                                       down == JNI_TRUE, released == JNI_TRUE); });
+                                       down == JNI_TRUE, pressed == JNI_TRUE); });
 }
 
 JNIEXPORT void JNICALL
@@ -365,7 +365,7 @@ Java_com_milkdrop_visualizer_render_ProjectMBridge_nativeFeedPcmInt16(
         handle->pcmScratch.resize(sampleCount);
         jshort* data = env->GetShortArrayElements(samples, nullptr);
         if (!data) return;
-        const float gain = std::isfinite(sensitivity) ? std::clamp(sensitivity, 0.0f, 10.0f) : 1.0f;
+        const float gain = std::isfinite(sensitivity) ? std::clamp(sensitivity, 0.0f, 25.0f) : 1.0f;
         // Float input preserves boosted detail; converting back to PCM16 would clip it first.
         for (size_t i = 0; i < sampleCount; ++i) {
             handle->pcmScratch[i] = static_cast<float>(data[i]) * (gain / 32768.0f);

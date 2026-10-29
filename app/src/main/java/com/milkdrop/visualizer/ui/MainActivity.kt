@@ -309,6 +309,7 @@ class MainActivity : AppCompatActivity() {
         binding.switchAutoAdvance.isChecked = autoAdvanceEnabled
         binding.switchBeatCuts.isChecked = beatCutsEnabled
         binding.switchPresetNameDuringTransitions.isChecked = settings.showPresetNameDuringTransitions
+        binding.switchSwipeGestures.isChecked = settings.swipeGesturesEnabled
         binding.switchScreenDependentRendering.isChecked = settings.screenDependentRendering
         configureTimingSpinner(binding.spinnerPresetDuration, R.array.preset_duration_options, presetDurationIndex)
         configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
@@ -692,7 +693,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 MotionEvent.ACTION_UP -> {
-                    sendPointer(event, event.actionIndex, false, released = true)
+                    sendPointer(event, event.actionIndex, false)
                     activeTouchPointer = -1
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -710,9 +711,9 @@ class MainActivity : AppCompatActivity() {
                 MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE,
                 MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE -> {
                     val down = event.buttonState and (MotionEvent.BUTTON_PRIMARY or MotionEvent.BUTTON_SECONDARY) != 0
-                    val released = event.actionMasked == MotionEvent.ACTION_BUTTON_RELEASE &&
+                    val pressed = event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS &&
                         event.actionButton and (MotionEvent.BUTTON_PRIMARY or MotionEvent.BUTTON_SECONDARY) != 0
-                    sendPointer(event, 0, down, released)
+                    sendPointer(event, 0, down, pressed)
                 }
                 MotionEvent.ACTION_HOVER_EXIT -> surfaceView.milkDropRenderer.clearPointer()
             }
@@ -720,7 +721,7 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchGenericMotionEvent(event)
     }
 
-    private fun sendPointer(event: MotionEvent, index: Int, down: Boolean, released: Boolean = false) {
+    private fun sendPointer(event: MotionEvent, index: Int, down: Boolean, pressed: Boolean = false) {
         val viewport = binding.surfaceContainer
         if (viewport.width <= 0 || viewport.height <= 0) return
         viewport.getLocationInWindow(pointerWindowOrigin)
@@ -728,7 +729,7 @@ class MainActivity : AppCompatActivity() {
         val y = (event.getY(index) - pointerWindowOrigin[1]) / viewport.height
         val inside = x in 0.0f..1.0f && y in 0.0f..1.0f
         surfaceView.milkDropRenderer.updatePointer(
-            if (inside) x else -1.0f, if (inside) y else -1.0f, down, released,
+            if (inside) x else -1.0f, if (inside) y else -1.0f, down, pressed,
         )
     }
 
@@ -794,7 +795,7 @@ class MainActivity : AppCompatActivity() {
             target.isSoundEffectsEnabled = false
             if (target !== surfaceView) target.setOnClickListener { surfaceView.performClick() }
             target.setOnTouchListener(VisualizationTouchListener(this,
-                canSwipe = { !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible },
+                canSwipe = { settings.swipeGesturesEnabled && !binding.settingsSheet.isVisible && !binding.playlistPanel.isVisible },
                 onSwipe = { swipe ->
                     when (swipe) {
                         VisualizationTouchListener.Swipe.LEFT -> surfaceView.milkDropRenderer.requestNavigation(Navigation.Next)
@@ -869,7 +870,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         listOf(binding.switchAutoAdvance, binding.switchBeatCuts, binding.switchPresetNameDuringTransitions,
-            binding.switchScreenDependentRendering, binding.switchStereoInternalAudio,
+            binding.switchScreenDependentRendering, binding.switchStereoInternalAudio, binding.switchSwipeGestures, binding.resetAudioSensitivity,
             binding.sliderAudioSensitivity, binding.sliderFftShaderScaling, binding.sliderFftShaderNoiseFloor).forEach {
             it.setBackgroundResource(R.drawable.remote_focus_background)
         }
@@ -941,6 +942,15 @@ class MainActivity : AppCompatActivity() {
         binding.groupAudioSource.onUserSelection { id ->
             audioCaptureManager.stopAll()
             startAudioInput(AUDIO_INPUT_BUTTON_IDS.entries.first { it.value == id }.key)
+        }
+        binding.switchSwipeGestures.setOnCheckedChangeListener { _, checked ->
+            settings.swipeGesturesEnabled = checked
+        }
+        binding.resetAudioSensitivity.setOnClickListener {
+            settings.audioSensitivity = AudioTuning.SENSITIVITY_DEFAULT
+            binding.sliderAudioSensitivity.progress = (AudioTuning.SENSITIVITY_DEFAULT * 10).roundToInt()
+            surfaceView.milkDropRenderer.audioSensitivity = settings.audioSensitivity
+            updateAudioTuningLabels()
         }
         binding.sliderAudioSensitivity.onUserProgress { progress ->
             settings.audioSensitivity = progress / 10.0f

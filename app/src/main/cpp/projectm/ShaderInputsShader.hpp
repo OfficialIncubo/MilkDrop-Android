@@ -13,6 +13,8 @@ static float4 _milkdrop_mouse = float4(-1.0, -1.0, 0.0, 0.0);
 #define mouse_y _milkdrop_mouse.y
 #define mouse_pos _milkdrop_mouse.xy
 #define mouse_clicked _milkdrop_mouse.z
+#define mouse_pressed _milkdrop_mouse.w
+// Historical alias retained for existing presets.
 #define mouse_released _milkdrop_mouse.w
 #define sysTime _milkdrop_sys_time
 #define sysDate _milkdrop_sys_date

@@ -22,7 +22,7 @@ object ProjectMBridge {
     external fun nativeSetWindowSize(handle: Long, width: Int, height: Int)
     external fun nativeSetScreenDependentRendering(handle: Long, enabled: Boolean)
     external fun nativeSetShaderAudioSettings(handle: Long, scaling: Float, noiseFloor: Float)
-    external fun nativeSetPointer(handle: Long, x: Float, y: Float, down: Boolean, released: Boolean)
+    external fun nativeSetPointer(handle: Long, x: Float, y: Float, down: Boolean, pressed: Boolean)
     external fun nativeRenderFrame(handle: Long)
     external fun nativeSetTextureSearchPaths(handle: Long, paths: Array<String>)
     external fun nativeSetPresetDuration(handle: Long, seconds: Double)

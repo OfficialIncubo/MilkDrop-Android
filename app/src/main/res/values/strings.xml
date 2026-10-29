@@ -130,4 +130,7 @@
     <string name="presets_none_found">No presets found. Add .milk files to MilkDropApp/presets, then reopen the app.</string>
     <string name="presets_need_access">Allow All files access so the app can read MilkDropApp/presets.</string>
     <string name="presets_storage_unavailable">Unable to create the presets or textures folder. Check storage access and available space.</string>
+    <string name="setting_swipe_gestures">Swipe gestures</string>
+    <string name="reset_audio_sensitivity">Reset</string>
+    <string name="reset_audio_sensitivity_description">Reset audio sensitivity to 1.0×</string>
 </resources>

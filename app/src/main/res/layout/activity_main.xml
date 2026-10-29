@@ -400,17 +400,39 @@
                     android:textColor="@color/overlay_content_secondary"
                     android:textSize="13sp" />
 
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchSwipeGestures"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/setting_swipe_gestures"
+                    android:textColor="@color/overlay_content"
+                    android:textSize="16sp" />
+
                 <TextView
                     android:id="@+id/audioSensitivityLabel"
                     style="@style/SettingLabel"
                     android:labelFor="@id/sliderAudioSensitivity"
                     android:text="@string/setting_audio_sensitivity" />
 
-                <SeekBar
-                    android:id="@+id/sliderAudioSensitivity"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:max="100" />
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <SeekBar
+                        android:id="@+id/sliderAudioSensitivity"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="48dp"
+                        android:max="250" />
+                    <Button
+                        android:id="@+id/resetAudioSensitivity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:text="@string/reset_audio_sensitivity"
+                        android:contentDescription="@string/reset_audio_sensitivity_description" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="match_parent"

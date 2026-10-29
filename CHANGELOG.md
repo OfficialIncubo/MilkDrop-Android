@@ -4,6 +4,13 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Changed
+
+- Extend audio sensitivity to 25×, with a reset to 1× beside the slider.
+- Add a saved Swipe gestures toggle, enabled by default.
+- Pulse mouseclick on touch/mouse press instead of release; keep mousedown active
+  throughout a hold and preserve short taps between rendered frames.
+
 ### Fixed
 
 - Use shape opacity independently of feedback texture alpha in legacy textured

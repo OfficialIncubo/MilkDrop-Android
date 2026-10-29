@@ -118,12 +118,12 @@ class MilkDropRenderer(
     var fftShaderNoiseFloor: Float = AudioTuning.FFT_NOISE_FLOOR_DEFAULT
 
     private data class PointerState(val x: Float = -1.0f, val y: Float = -1.0f,
-        val down: Boolean = false, val released: Boolean = false)
+        val down: Boolean = false, val pressed: Boolean = false)
     private val pointer = AtomicReference(PointerState())
 
     /** Positions cover the whole visualization, including touches delivered to overlay controls. */
-    fun updatePointer(x: Float, y: Float, down: Boolean, released: Boolean = false) {
-        pointer.updateAndGet { previous -> PointerState(x, y, down, previous.released || released) }
+    fun updatePointer(x: Float, y: Float, down: Boolean, pressed: Boolean = false) {
+        pointer.updateAndGet { previous -> PointerState(x, y, down, previous.pressed || pressed || (down && !previous.down)) }
     }
 
     fun clearPointer() {
@@ -131,8 +131,8 @@ class MilkDropRenderer(
     }
 
     private fun applyPointer() {
-        val state = pointer.getAndUpdate { if (it.released) it.copy(released = false) else it }
-        ProjectMBridge.nativeSetPointer(handle, state.x, state.y, state.down, state.released)
+        val state = pointer.getAndUpdate { if (it.pressed) it.copy(pressed = false) else it }
+        ProjectMBridge.nativeSetPointer(handle, state.x, state.y, state.down, state.pressed)
     }
 
     private var appliedShuffle: Boolean? = null
