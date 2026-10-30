@@ -13,6 +13,8 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Fixed
 
+- Preserve named shape image transparency, including the idle M and headphones,
+  while retaining BeatDrop-compatible diffuse alpha for feedback shapes.
 - Use shape opacity independently of feedback texture alpha in legacy textured
   drawing, matching BeatDrop's diffuse-alpha blend state. This restores presets
   such as `shifter - swarm` that otherwise fade to black.

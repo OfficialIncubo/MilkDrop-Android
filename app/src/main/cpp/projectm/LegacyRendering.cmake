@@ -65,6 +65,14 @@ patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/CustomShape.hp
     Renderer::Mesh m_fillMesh;]=]
 )
 patch_projectm_copy(MilkdropPreset src/libprojectM/MilkdropPreset/CustomShape.cpp
+    [=[            auto textureAspectY = m_presetState.renderContext.aspectY;]=]
+    [=[            auto textureAspectY = m_presetState.renderContext.aspectY;
+            // Reset for every instance: the shared shader must not inherit a named
+            // image's alpha mode when the next shape uses feedback or a missing image.
+            shader->SetUniformFloat("milkdrop_image_alpha", 0.0f);]=]
+    [=[                    textureAspectY = 1.0f;]=]
+    [=[                    textureAspectY = 1.0f;
+                    shader->SetUniformFloat("milkdrop_image_alpha", 1.0f);]=]
     [=[            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);]=]
     [=[            // A bound sampler overrides glTexParameteri, including a named
