@@ -1548,10 +1548,14 @@ class MainActivity : AppCompatActivity() {
         )
         const val MESH_SIZE_MIN = 8
         const val MESH_SIZE_MAX = 300
-        const val AUTO_QUALITY_DOWNGRADE_THRESHOLD = 0.92f
-        const val AUTO_QUALITY_UPGRADE_THRESHOLD = 0.95f
-        const val AUTO_QUALITY_DOWNGRADE_SAMPLES = 1
-        const val AUTO_QUALITY_UPGRADE_SAMPLES = 2
+        // Samples average roughly one second. Hold quality through brief dips and the
+        // near-target band; only sustained shortfall should lower the resolution.
+        // At 60 Hz: two samples below 50 FPS lower one tier, 50–59 holds,
+        // and a sample at 60 FPS allows one higher tier per second.
+        const val AUTO_QUALITY_DOWNGRADE_THRESHOLD = 50f / 60f
+        const val AUTO_QUALITY_UPGRADE_THRESHOLD = 1.0f
+        const val AUTO_QUALITY_DOWNGRADE_SAMPLES = 2
+        const val AUTO_QUALITY_UPGRADE_SAMPLES = 1
 
         val AUDIO_INPUT_BUTTON_IDS = mapOf(
             AudioInput.MIC to R.id.audioSourceMic,

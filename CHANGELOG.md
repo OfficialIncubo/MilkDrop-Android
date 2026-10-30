@@ -6,8 +6,10 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Changed
 
-- Use a quality dropdown with Auto and seven resolution tiers from 15% to 100%.
+- Use a quality dropdown with Auto and eleven resolution tiers from 10% to 100%.
   Auto targets 60 FPS independently of the saved frame-rate choice and reacts faster.
+- Hold Auto quality through brief FPS dips, require two low-FPS samples to step
+  down below 50 FPS, and allow one step up per second when the measured rate reaches 60 FPS.
 - Add remote Up/Down navigation between the sidebar and Cast, and Left/Right
   adjustment of focused mesh number fields.
 - Extend audio sensitivity to 25×, with a reset to 1× beside the slider.
