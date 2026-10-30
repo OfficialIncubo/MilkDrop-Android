@@ -364,7 +364,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyQuality(resetAutomaticLevel: Boolean = true) {
-        surfaceView.targetFps = if (qualityIndex == QUALITY_AUTO) 60 else FrameRates.options[fpsIndex]
         if (qualityIndex == QUALITY_AUTO && resetAutomaticLevel) {
             adaptiveQualityIndex = QUALITY_ULTRA_HIGH
             lowFpsSamples = 0
@@ -391,8 +390,12 @@ class MainActivity : AppCompatActivity() {
     private fun onMeasuredRenderFps(fps: Int) {
         if (qualityIndex != QUALITY_AUTO || fps <= 0 || isDestroyed) return
         val target = expectedRenderFps()
+        // Keep the requested 50–60 band whenever attainable. Lower intentional caps
+        // need a proportional band, otherwise normal capped rendering looks like lag.
+        val lowerBound = if (target >= 50) 50 else
+            (target * AUTO_QUALITY_DOWNGRADE_THRESHOLD).roundToInt()
         when {
-            fps < (target * AUTO_QUALITY_DOWNGRADE_THRESHOLD).roundToInt() -> {
+            fps < lowerBound -> {
                 lowFpsSamples++
                 highFpsSamples = 0
                 if (lowFpsSamples >= AUTO_QUALITY_DOWNGRADE_SAMPLES && adaptiveQualityIndex > QUALITY_ULTRA_LOW) {
@@ -421,7 +424,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun expectedRenderFps(): Int {
         val displayRate = (surfaceView.display?.refreshRate ?: 60f).roundToInt().coerceAtLeast(24)
-        return minOf(60, displayRate)
+        val selectedFps = FrameRates.options[fpsIndex]
+        return minOf(60, displayRate, if (selectedFps == 0) Int.MAX_VALUE else selectedFps)
     }
 
     /**
@@ -1141,7 +1145,9 @@ class MainActivity : AppCompatActivity() {
             // to 24/30 Hz. Android still makes the final choice based on device policy.
             preferredRefreshRate = if (fps == 0) highest else if (fps > 60) fps.toFloat() else 0f
         }
-        if (qualityIndex == QUALITY_AUTO) applyQuality()
+        // Discard samples measured under the previous cap without resetting resolution.
+        lowFpsSamples = 0
+        highFpsSamples = 0
     }
 
     private fun Spinner.onUserSelection(action: (Int) -> Unit) {

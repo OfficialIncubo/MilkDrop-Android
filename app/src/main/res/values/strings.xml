@@ -94,7 +94,7 @@
     <string name="quality_auto">Auto</string>
     <string name="quality_ultra_low">Ultra low</string>
     <string-array name="quality_options">
-        <item>Auto (60 FPS)</item>
+        <item>Auto</item>
         <item>Ultra low — 10%</item>
         <item>Ultra low — 15%</item>
         <item>Very low — 25%</item>
@@ -113,7 +113,7 @@
     <string name="quality_high">High</string>
     <string name="quality_very_high">Very high</string>
     <string name="quality_ultra_high">Ultra high</string>
-    <string name="quality_auto_description">Auto targets 60 FPS, overriding the selected frame rate, and quickly adjusts resolution. Currently using %1$s (%2$d%% of display width and height). Mesh size stays unchanged.</string>
+    <string name="quality_auto_description">Auto respects your frame-rate setting and adjusts resolution around 50–60 FPS. For limits below 50 FPS, the range scales down to match. Currently using %1$s (%2$d%% of display width and height). Mesh size stays unchanged.</string>
     <string name="quality_fixed_description">%1$s renders at %2$d%% of display resolution. Mesh size stays unchanged.</string>
     <string name="setting_audio_source">Audio source</string>
     <string name="audio_source_mic">Microphone</string>
