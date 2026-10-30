@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity() {
         configureTimingSpinner(binding.spinnerAdditionalRandom, R.array.additional_random_options, additionalRandomIndex)
         configureTimingSpinner(binding.spinnerTransitionTime, R.array.transition_time_options, transitionTimeIndex)
         configureTimingSpinner(binding.spinnerFrameRate, R.array.frame_rate_options, fpsIndex)
-        binding.groupQuality.check(QUALITY_BUTTON_IDS[qualityIndex])
+        configureTimingSpinner(binding.spinnerQuality, R.array.quality_options, qualityIndex)
         binding.sliderMeshSizeX.progress = settings.meshColumns
         binding.sliderMeshSizeY.progress = settings.meshRows
         binding.inputMeshSizeX.setText(settings.meshColumns.toString())
@@ -364,6 +364,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyQuality(resetAutomaticLevel: Boolean = true) {
+        surfaceView.targetFps = if (qualityIndex == QUALITY_AUTO) 60 else FrameRates.options[fpsIndex]
         if (qualityIndex == QUALITY_AUTO && resetAutomaticLevel) {
             adaptiveQualityIndex = QUALITY_ULTRA_HIGH
             lowFpsSamples = 0
@@ -394,7 +395,7 @@ class MainActivity : AppCompatActivity() {
             fps < (target * AUTO_QUALITY_DOWNGRADE_THRESHOLD).roundToInt() -> {
                 lowFpsSamples++
                 highFpsSamples = 0
-                if (lowFpsSamples >= AUTO_QUALITY_DOWNGRADE_SAMPLES && adaptiveQualityIndex > QUALITY_VERY_LOW) {
+                if (lowFpsSamples >= AUTO_QUALITY_DOWNGRADE_SAMPLES && adaptiveQualityIndex > QUALITY_ULTRA_LOW) {
                     adaptiveQualityIndex--
                     lowFpsSamples = 0
                     surfaceView.setResolutionScale(QUALITY_SCALES[adaptiveQualityIndex])
@@ -419,9 +420,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun expectedRenderFps(): Int {
-        val configured = surfaceView.targetFps
         val displayRate = (surfaceView.display?.refreshRate ?: 60f).roundToInt().coerceAtLeast(24)
-        return if (configured == 0) displayRate else minOf(configured, displayRate)
+        return minOf(60, displayRate)
     }
 
     /**
@@ -999,8 +999,9 @@ class MainActivity : AppCompatActivity() {
             settings.fpsIndex = fpsIndex
             applyFrameRate()
         }
-        binding.groupQuality.onUserSelection { id ->
-            qualityIndex = QUALITY_BUTTON_IDS.indexOf(id).takeIf { it >= 0 } ?: return@onUserSelection
+        binding.spinnerQuality.onUserSelection { index ->
+            if (index == qualityIndex) return@onUserSelection
+            qualityIndex = index
             settings.qualityIndex = qualityIndex
             applyQuality()
         }
@@ -1083,6 +1084,23 @@ class MainActivity : AppCompatActivity() {
             apply(value ?: if (input === binding.inputMeshSizeX) settings.meshColumns else settings.meshRows)
         }
         input.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) commit() }
+        // Up/down remain available for moving through settings. Left/right adjust the
+        // focused value directly without requiring a remote's on-screen keyboard.
+        input.setOnKeyListener { _, keyCode, event ->
+            if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT && keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) {
+                false
+            } else {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    val current = input.text.toString().toIntOrNull()
+                        ?: if (input === binding.inputMeshSizeX) settings.meshColumns else settings.meshRows
+                    val next = (current + if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
+                        .coerceIn(MESH_SIZE_MIN, MESH_SIZE_MAX)
+                    input.setText(next.toString())
+                    apply(next)
+                }
+                true
+            }
+        }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId != EditorInfo.IME_ACTION_DONE) return@setOnEditorActionListener false
             commit()
@@ -1360,6 +1378,17 @@ class MainActivity : AppCompatActivity() {
                     hideRemoteControls()
                     return true
                 }
+                if (key == KeyEvent.KEYCODE_DPAD_UP && binding.btnCast.isVisible &&
+                    currentFocus != binding.btnCast) {
+                    consumedRemoteKeys.add(key)
+                    binding.btnCast.requestFocus()
+                    return true
+                }
+                if (key == KeyEvent.KEYCODE_DPAD_DOWN && currentFocus == binding.btnCast) {
+                    consumedRemoteKeys.add(key)
+                    binding.btnSettings.requestFocus()
+                    return true
+                }
                 if (currentFocus == null) {
                     showRemoteControls()
                     consumedRemoteKeys.add(key)
@@ -1507,28 +1536,20 @@ class MainActivity : AppCompatActivity() {
 
         // Quality affects the output buffer only. Per-point warp mesh density remains user-controlled.
         const val QUALITY_AUTO = 0
-        const val QUALITY_VERY_LOW = 1
-        const val QUALITY_LOW = 2
-        const val QUALITY_MEDIUM = 3
-        const val QUALITY_HIGH = 4
-        const val QUALITY_VERY_HIGH = 5
-        const val QUALITY_ULTRA_HIGH = 6
-        val QUALITY_SCALES = floatArrayOf(1.0f, 0.35f, 0.50f, 0.65f, 0.80f, 0.90f, 1.0f)
-        val QUALITY_BUTTON_IDS = intArrayOf(
-            R.id.qualityAuto, R.id.qualityVeryLow, R.id.qualityLow, R.id.qualityMedium,
-            R.id.qualityHigh, R.id.qualityVeryHigh, R.id.qualityUltraHigh,
-        )
+        const val QUALITY_ULTRA_LOW = 1
+        const val QUALITY_ULTRA_HIGH = 7
+        val QUALITY_SCALES = floatArrayOf(1.0f, 0.15f, 0.25f, 0.40f, 0.50f, 0.70f, 0.85f, 1.0f)
         val QUALITY_NAME_IDS = intArrayOf(
-            R.string.quality_auto, R.string.quality_very_low, R.string.quality_low,
+            R.string.quality_auto, R.string.quality_ultra_low, R.string.quality_very_low, R.string.quality_low,
             R.string.quality_medium, R.string.quality_high, R.string.quality_very_high,
             R.string.quality_ultra_high,
         )
         const val MESH_SIZE_MIN = 8
         const val MESH_SIZE_MAX = 300
-        const val AUTO_QUALITY_DOWNGRADE_THRESHOLD = 0.82f
+        const val AUTO_QUALITY_DOWNGRADE_THRESHOLD = 0.92f
         const val AUTO_QUALITY_UPGRADE_THRESHOLD = 0.95f
-        const val AUTO_QUALITY_DOWNGRADE_SAMPLES = 2
-        const val AUTO_QUALITY_UPGRADE_SAMPLES = 4
+        const val AUTO_QUALITY_DOWNGRADE_SAMPLES = 1
+        const val AUTO_QUALITY_UPGRADE_SAMPLES = 2
 
         val AUDIO_INPUT_BUTTON_IDS = mapOf(
             AudioInput.MIC to R.id.audioSourceMic,

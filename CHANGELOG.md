@@ -6,6 +6,10 @@ All notable changes to this app. Versions follow [Semantic Versioning](https://s
 
 ### Changed
 
+- Use a quality dropdown with Auto and seven resolution tiers from 15% to 100%.
+  Auto targets 60 FPS independently of the saved frame-rate choice and reacts faster.
+- Add remote Up/Down navigation between the sidebar and Cast, and Left/Right
+  adjustment of focused mesh number fields.
 - Extend audio sensitivity to 25×, with a reset to 1× beside the slider.
 - Add a saved Swipe gestures toggle, enabled by default.
 - Pulse mouseclick on touch/mouse press instead of release; keep mousedown active

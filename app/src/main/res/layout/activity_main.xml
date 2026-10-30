@@ -344,6 +344,8 @@
 
                     <SeekBar
                         android:id="@+id/sliderMeshSizeX"
+                        android:contentDescription="@string/mesh_size_x_accessibility"
+                        android:focusable="true"
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
@@ -353,6 +355,8 @@
 
                     <EditText
                         android:id="@+id/inputMeshSizeX"
+                        android:contentDescription="@string/mesh_size_x_accessibility"
+                        android:singleLine="true"
                         android:layout_width="64dp"
                         android:layout_height="48dp"
                         android:gravity="center"
@@ -379,6 +383,8 @@
 
                     <SeekBar
                         android:id="@+id/sliderMeshSizeY"
+                        android:contentDescription="@string/mesh_size_y_accessibility"
+                        android:focusable="true"
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
@@ -388,6 +394,8 @@
 
                     <EditText
                         android:id="@+id/inputMeshSizeY"
+                        android:contentDescription="@string/mesh_size_y_accessibility"
+                        android:singleLine="true"
                         android:layout_width="64dp"
                         android:layout_height="48dp"
                         android:gravity="center"
@@ -408,50 +416,13 @@
 
                 <TextView
                     style="@style/SettingLabel"
-                    android:labelFor="@id/groupQuality"
+                    android:labelFor="@id/spinnerQuality"
                     android:text="@string/setting_quality" />
 
-                <RadioGroup
-                    android:id="@+id/groupQuality"
-                    style="@style/SegmentedGroup"
-                    android:orientation="vertical">
-
-                    <RadioButton
-                        android:id="@+id/qualityAuto"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_auto" />
-
-                    <RadioButton
-                        android:id="@+id/qualityVeryLow"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_very_low" />
-
-                    <RadioButton
-                        android:id="@+id/qualityLow"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_low" />
-
-                    <RadioButton
-                        android:id="@+id/qualityMedium"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_medium" />
-
-                    <RadioButton
-                        android:id="@+id/qualityHigh"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_high" />
-
-                    <RadioButton
-                        android:id="@+id/qualityVeryHigh"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_very_high" />
-
-                    <RadioButton
-                        android:id="@+id/qualityUltraHigh"
-                        style="@style/QualitySegment"
-                        android:text="@string/quality_ultra_high" />
-
-                </RadioGroup>
+                <Spinner
+                    android:id="@+id/spinnerQuality"
+                    style="@style/TimingSpinner"
+                    android:contentDescription="@string/setting_quality" />
 
                 <TextView
                     android:id="@+id/qualityDescription"
