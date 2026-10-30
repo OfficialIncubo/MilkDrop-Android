@@ -1,6 +1,6 @@
 <resources>
     <string name="engine_info_title">Engine information</string>
-    <string name="engine_fps_value">%1$d FPS</string>
+    <string name="engine_fps_value">%1$.1f FPS</string>
     <string name="engine_fps_measuring">Measuring FPS…</string>
     <string name="engine_live_info">%1$s ◉ projectM %2$s with MilkDrop patches</string>
     <string name="engine_patch_info">MilkDrop uses a customized projectM engine to run MilkDrop presets. Its patches improve BeatDrop compatibility for waveforms, FFT shader functions, accurate beat detection, textures, preset variables and pixel alignment, and add date/time and touch input.</string>

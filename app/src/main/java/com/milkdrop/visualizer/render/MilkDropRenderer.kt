@@ -8,6 +8,7 @@ import com.milkdrop.visualizer.settings.AudioTuning
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.roundToInt
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -189,15 +190,15 @@ class MilkDropRenderer(
 
     private val frameRateMeter = FrameRateMeter()
     private var reportedFps = 0
-    @Volatile private var frameRateReading: Pair<Int, Long>? = null
+    @Volatile private var frameRateReading: Pair<Double, Long>? = null
 
     /** Receives one measured-FPS sample at a time; listeners must move UI work to the main thread. */
     @Volatile
     var onFrameRateMeasured: ((fps: Int) -> Unit)? = null
 
     /** Measured render FPS, rather than the configured cap; stale readings show a stopped renderer. */
-    fun currentFramesPerSecond(): Int? = frameRateReading?.let { (fps, sampledAt) ->
-        if (System.nanoTime() - sampledAt > 1_500_000_000L) 0 else fps
+    fun currentFramesPerSecond(): Double? = frameRateReading?.let { (fps, sampledAt) ->
+        if (System.nanoTime() - sampledAt > 1_500_000_000L) 0.0 else fps
     }
 
     /** Guards [handle] against being destroyed while the audio thread is mid-[feedPcm]. */
@@ -281,8 +282,10 @@ class MilkDropRenderer(
      * (35), and those that scale motion by `fps` ran too fast at higher frame rates.
      */
     private fun reportFrameRate(nowNanos: Long) {
-        val fps = frameRateMeter.onFrame(nowNanos) ?: return
-        frameRateReading = fps to nowNanos
+        val measuredFps = frameRateMeter.onFrame(nowNanos) ?: return
+        frameRateReading = measuredFps to nowNanos
+        // Preserve the existing integer engine/adaptation inputs; the UI keeps full precision.
+        val fps = measuredFps.roundToInt()
         onFrameRateMeasured?.invoke(fps)
         if (fps != reportedFps && handle != 0L) {
             ProjectMBridge.nativeSetFps(handle, fps)
