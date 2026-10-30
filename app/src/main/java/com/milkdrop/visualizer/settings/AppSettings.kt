@@ -66,8 +66,11 @@ class AppSettings(context: Context) {
                 // The previous three entries were High, Medium and Low respectively. Keep that
                 // intent when moving to the expanded quality list instead of silently changing
                 // existing installations to Auto.
-                val migrated = if (prefs.getInt(KEY_QUALITY_SCHEMA, 1) == 2) {
-                    if (stored == 0) 0 else stored.coerceIn(1, 6) + 1
+                val previousTiers = intArrayOf(0, 2, 3, 5, 6, 8, 10, 11)
+                val migrated = if (prefs.getInt(KEY_QUALITY_SCHEMA, 1) == 3) {
+                    previousTiers[stored.coerceIn(0, 7)]
+                } else if (prefs.getInt(KEY_QUALITY_SCHEMA, 1) == 2) {
+                    previousTiers[if (stored == 0) 0 else stored.coerceIn(1, 6) + 1]
                 } else when (stored.coerceIn(0, 2)) {
                     0 -> QUALITY_VERY_HIGH
                     1 -> QUALITY_MEDIUM
@@ -158,11 +161,11 @@ class AppSettings(context: Context) {
         const val KEY_LAST_PRESET_PATH = "last_preset_path"
 
         const val QUALITY_AUTO = 0
-        const val QUALITY_LOW = 3
-        const val QUALITY_MEDIUM = 4
-        const val QUALITY_VERY_HIGH = 6
-        const val QUALITY_ULTRA_HIGH = 7
-        const val QUALITY_SCHEMA_VERSION = 3
+        const val QUALITY_LOW = 5
+        const val QUALITY_MEDIUM = 6
+        const val QUALITY_VERY_HIGH = 10
+        const val QUALITY_ULTRA_HIGH = 11
+        const val QUALITY_SCHEMA_VERSION = 4
         const val MIN_MESH_SIZE = 8
         const val MAX_MESH_SIZE = 300
         const val DEFAULT_MESH_COLUMNS = 32

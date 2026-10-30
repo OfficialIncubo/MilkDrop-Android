@@ -1537,11 +1537,13 @@ class MainActivity : AppCompatActivity() {
         // Quality affects the output buffer only. Per-point warp mesh density remains user-controlled.
         const val QUALITY_AUTO = 0
         const val QUALITY_ULTRA_LOW = 1
-        const val QUALITY_ULTRA_HIGH = 7
-        val QUALITY_SCALES = floatArrayOf(1.0f, 0.15f, 0.25f, 0.40f, 0.50f, 0.70f, 0.85f, 1.0f)
+        const val QUALITY_ULTRA_HIGH = 11
+        val QUALITY_SCALES = floatArrayOf(1.0f, 0.10f, 0.15f, 0.25f, 0.35f, 0.40f, 0.50f, 0.65f, 0.70f, 0.75f, 0.85f, 1.0f)
         val QUALITY_NAME_IDS = intArrayOf(
-            R.string.quality_auto, R.string.quality_ultra_low, R.string.quality_very_low, R.string.quality_low,
-            R.string.quality_medium, R.string.quality_high, R.string.quality_very_high,
+            R.string.quality_auto, R.string.quality_ultra_low, R.string.quality_ultra_low,
+            R.string.quality_very_low, R.string.quality_low, R.string.quality_low,
+            R.string.quality_medium, R.string.quality_high, R.string.quality_high,
+            R.string.quality_high, R.string.quality_very_high,
             R.string.quality_ultra_high,
         )
         const val MESH_SIZE_MIN = 8

@@ -95,11 +95,15 @@
     <string name="quality_ultra_low">Ultra low</string>
     <string-array name="quality_options">
         <item>Auto (60 FPS)</item>
+        <item>Ultra low — 10%</item>
         <item>Ultra low — 15%</item>
         <item>Very low — 25%</item>
+        <item>Low — 35%</item>
         <item>Low — 40%</item>
         <item>Medium — 50%</item>
+        <item>High — 65%</item>
         <item>High — 70%</item>
+        <item>High — 75%</item>
         <item>Very high — 85%</item>
         <item>Ultra high — 100%</item>
     </string-array>
